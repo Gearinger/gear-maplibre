@@ -8,8 +8,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "flatgeobuf": "^3.23.0",
+    "json-formatter-js": "^2.3.4",
     "mapbox-gl-draw": "^0.16.0",
     "maplibre-gl": "^2.1.9",
+    "pbf": "^3.2.1",
     "vue": "^3.2.25"
   },
   "devDependencies": {

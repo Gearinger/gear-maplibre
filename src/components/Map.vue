@@ -4,10 +4,11 @@
 
 <script setup lang="ts">
 import { onMounted } from "vue";
-import maplibregl, { Map, StyleSpecification } from "maplibre-gl";
+import maplibregl, { Feature, Map, StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import MapboxDraw from "mapbox-gl-draw";
 import "mapbox-gl-draw/dist/mapbox-gl-draw.css";
+import { geojson } from "flatgeobuf";
 
 /**
  * 添加geojson数据到地图上
@@ -45,11 +46,48 @@ function addPbfLayer(map: Map) {
     id: "pbfLayer",
     type: "fill",
     source: "pbfLayer",
-    "source-layer": "0206000000",
-    layout: {},
+    "source-layer": "default",
   });
 
   map.fitBounds(map.getBounds());
+}
+
+/**
+ * 将 FlatGeoBuf 数据添加到地图上
+ * @param fgb FlatGeobuf
+ * @param map 地图
+ */
+async function addFlatGeoBuf(fgb: any, map: Map) {
+  const fc = { type: "FeatureCollection", features: [] as any[] };
+  let i = 0;
+
+  for await (const f of geojson.deserialize(
+    fgb,
+    undefined,
+    undefined
+  ) as AsyncGenerator<any>) {
+    fc.features.push({ ...f, id: i });
+    i += 1;
+  }
+
+  map.addSource("counties", {
+    type: "geojson",
+    data: fc,
+  });
+  map.addLayer({
+    id: "counties-fill",
+    type: "fill",
+    source: "counties",
+    paint: {
+      "fill-color": "#0000FF",
+      "fill-opacity": [
+        "case",
+        ["boolean", ["feature-state", "hover"], false],
+        1,
+        0.5,
+      ],
+    },
+  });
 }
 
 // 挂载时初始化地图
@@ -88,9 +126,12 @@ onMounted(() => {
   map.addControl(new MapboxDraw(), "top-left");
 
   // 地图加载时，添加 geojson 数据
-  map.on("load", () => {
+  map.on("load", async () => {
     // addTestGeoJson(map);
-    addPbfLayer(map);
+    // addPbfLayer(map);
+    const response = await fetch("./data/fgb.fgb").then((res) =>
+      addFlatGeoBuf(res.body, map)
+    );
   });
 
   // 点击地图时，获取点击位置的要素
