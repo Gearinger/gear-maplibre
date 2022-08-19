@@ -40,13 +40,26 @@ function addTestGeoJson(map: Map) {
 function addPbfLayer(map: Map) {
   map.addSource("pbfLayer", {
     type: "vector",
-    tiles: ["http://127.0.0.1:9005/business/field/pbfLayer/{z}/{x}/{y}"],
+    tiles: ["http://127.0.0.1:9005/business/field/pbfLayer/field/{z}/{x}/{y}"],
   });
   map.addLayer({
     id: "pbfLayer",
     type: "fill",
     source: "pbfLayer",
     "source-layer": "default",
+    "paint": {
+      "fill-color": [
+        "match",
+        ["get", "name"],
+        ["0403020000"],
+        "#CDEBF2",
+        ["0206000000"],
+        "#F8CDD0",
+        ["0201000000"],
+        "#92D050",
+        "#F39F72",
+      ]
+    }
   });
 
   map.fitBounds(map.getBounds());
@@ -88,6 +101,7 @@ async function addFlatGeoBuf(fgb: any, map: Map) {
       ],
     },
   });
+  map.querySourceFeatures("")
 }
 
 // 挂载时初始化地图
@@ -128,10 +142,10 @@ onMounted(() => {
   // 地图加载时，添加 geojson 数据
   map.on("load", async () => {
     // addTestGeoJson(map);
-    // addPbfLayer(map);
-    const response = await fetch("./data/fgb.fgb").then((res) =>
-      addFlatGeoBuf(res.body, map)
-    );
+    addPbfLayer(map);
+    // const response = await fetch("./data/fgb.fgb").then((res) =>
+    //   addFlatGeoBuf(res.body, map)
+    // );
   });
 
   // 点击地图时，获取点击位置的要素

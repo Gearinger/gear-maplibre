@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@turf/turf": "^6.5.0",
     "flatgeobuf": "^3.23.0",
     "json-formatter-js": "^2.3.4",
     "mapbox-gl-draw": "^0.16.0",
