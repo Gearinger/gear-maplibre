@@ -144,3 +144,23 @@ export function markCurrentPos(map: maplibregl.Map) {
         alert("定位失败！");
     });
 }
+
+/**
+ * 添加瓦片底图
+ * @param map 
+ * @param url 
+ */
+export function addTileLayer(map: maplibregl.Map, url: string) {
+    // 添加影像底图
+    map.addSource('raster', {
+        type: "raster",
+        tiles: [url],
+        tileSize: 256
+    });
+    map.addLayer({
+        id: "raster-layer",
+        type: "raster",
+        source: "raster"
+    })
+
+}

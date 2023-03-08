@@ -1,5 +1,6 @@
 <template lang="">
   <div id="map"></div>
+  <SideMenu/>
 </template>
 
 <script setup lang="ts">
@@ -10,8 +11,10 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import MapboxDraw from "mapbox-gl-draw";
 import "mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
-import { drawAnno, markCurrentPos, addFlatGeoBuf, addTestGeoJson } from "../common/MaplibreUtil"
+import { drawAnno, markCurrentPos, addFlatGeoBuf, addTestGeoJson, addTileLayer } from "../common/MaplibreUtil"
 import * as mapUtil from "map-gl-utils"
+import { tdt_raster_url } from "../common/Config";
+import SideMenu from "./SideMenu.vue";
 
 // 挂载时初始化地图
 onMounted(() => {
@@ -20,17 +23,7 @@ onMounted(() => {
 
   // 地图加载时，添加 geojson 数据
   map.on("load", async () => {
-    addTestGeoJson(map);
-    // addPbfLayer(map);
-    // const response = await fetch("./data/fgb.fgb").then((res) =>
-    //   addFlatGeoBuf(res.body, map)
-    // );
-
-    markCurrentPos(map);
-
-    console.log(map);
-
-    // map.setLayoutProperty('testGeoJson', 'text-color', "#ff0000");
+    addTileLayer(map, tdt_raster_url)
   });
 
   // 点击地图时，获取点击位置的要素
@@ -82,9 +75,6 @@ function initMap(): Map {
 function addControllers(map: Map) {
   // 添加常用地图控件
   map.addControl(new NavigationControl({}));
-  // 添加地图绘制控件
-  const draw = new MapboxDraw();
-  map.addControl(draw, "top-left");
 }
 </script>
 
