@@ -1,35 +1,34 @@
 <template lang="">
   <div id="map"></div>
-  <SideMenu/>
+  <SideMenu :map="map"/>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, reactive, ref } from "vue";
 import { Feature, Map, StyleSpecification, NavigationControl, GeoJSONFeature, MapLayerEventType } from "maplibre-gl";
-import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import MapboxDraw from "mapbox-gl-draw";
-import "mapbox-gl-draw/dist/mapbox-gl-draw.css";
-
-import { drawAnno, markCurrentPos, addFlatGeoBuf, addTestGeoJson, addTileLayer } from "../common/MaplibreUtil"
-import * as mapUtil from "map-gl-utils"
+import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
+import { drawAnno, markCurrentPos, addFlatGeoBuf, addGeoJson, addTileLayer } from "../common/MaplibreUtil"
 import { tdt_raster_url } from "../common/Config";
+
 import SideMenu from "./SideMenu.vue";
+
+const map = ref<Map>()
 
 // 挂载时初始化地图
 onMounted(() => {
-  const map = initMap();
-  addControllers(map);
+  map.value = initMap();
+  addControllers(map.value);
 
-  // 地图加载时，添加 geojson 数据
-  map.on("load", async () => {
-    addTileLayer(map, tdt_raster_url)
+  // 地图加载时
+  map.value.on("load", async () => {
+    addTileLayer(map.value as Map, tdt_raster_url)
   });
 
   // 点击地图时，获取点击位置的要素
-  map.on("click", (e) => {
+  map.value.on("click", (e) => {
     console.log(e);
-    let feas = map.queryRenderedFeatures(e.point, {});
+    let feas = (map.value as Map).queryRenderedFeatures(e.point, {});
     console.log(feas);
   });
 
@@ -44,7 +43,7 @@ function initMap(): Map {
     version: 8,
     name: "BlankMap",
     sources: {},
-    glyphs:"./data/glyphs/{fontstack}/{range}.pbf",
+    glyphs: "./data/glyphs/{fontstack}/{range}.pbf",
     layers: [
       {
         id: "background",
@@ -79,13 +78,9 @@ function addControllers(map: Map) {
 </script>
 
 <style>
-body {
-  margin: 0;
-  padding: 0;
-}
-
 #map {
   position: absolute;
+  z-index: 0;
   top: 0;
   bottom: 0;
   width: 100%;

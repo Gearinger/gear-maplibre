@@ -43,16 +43,16 @@ export async function addFlatGeoBuf(fgb: any, map: Map) {
 /**
  * 添加geojson数据到地图上
  */
-export function addTestGeoJson(map: Map) {
-    map.addSource("testGeoJson", {
+export function addGeoJson(map: Map, json: String) {
+    map.addSource("GeoJson", {
         type: "geojson",
         // data: "http://192.168.10.95:8999/geoserver/nansha/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=nansha%3Afield&maxFeatures=40000&outputFormat=application%2Fjson",
-        data: "./data/smallGeoJSON.geojson"
+        data: json
     });
     map.addLayer({
-        id: "testGeoJson",
+        id: "geoJson",
         type: "fill",
-        source: "testGeoJson",
+        source: "GeoJson",
         layout: {},
         paint: {
             "fill-color": "#088",
@@ -61,11 +61,12 @@ export function addTestGeoJson(map: Map) {
         },
     });
     map.addLayer({
-        id: "testGeoJsonAnno",
+        id: "geoJsonAnno",
         type: "symbol",
-        source: "testGeoJson",
+        source: "GeoJson",
         layout: {
-            "text-field": "{name}"
+            "text-field": "{name}",
+            "text-size": 11
         },
     });
 
