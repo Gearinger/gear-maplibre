@@ -7,10 +7,13 @@ import Map from "./components/Map.vue";
 </script>
 
 <template>
-  <Map name="maplibre-map"></Map>
+  <Map></Map>
 </template>
 
-<style>
+<style lang="less">
+@import 'ant-design-vue/dist/antd.dark.css';
+
+
 body {
   margin: 0;
   padding: 0;

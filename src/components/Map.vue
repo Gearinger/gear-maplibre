@@ -1,19 +1,34 @@
 <template lang="">
   <div id="map"></div>
-  <SideMenu :map="map"/>
+  <!-- <SideMenu :map="map"/> -->
+  <LayerManager :map="map"></LayerManager>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
-import { Feature, Map, StyleSpecification, NavigationControl, GeoJSONFeature, MapLayerEventType } from "maplibre-gl";
+import {
+  Feature,
+  Map,
+  StyleSpecification,
+  NavigationControl,
+  GeoJSONFeature,
+  MapLayerEventType,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { drawAnno, markCurrentPos, addFlatGeoBuf, addGeoJson, addTileLayer } from "../common/MaplibreUtil"
+import {
+  drawAnno,
+  markCurrentPos,
+  addFlatGeoBuf,
+  addGeoJson,
+  addTileLayer,
+} from "../common/MaplibreUtil";
 import { tdt_raster_url } from "../common/Config";
 
 import SideMenu from "./SideMenu.vue";
+import LayerManager from "./LayerManager.vue";
 
-const map = ref<Map>()
+const map = ref<Map>();
 
 // 挂载时初始化地图
 onMounted(() => {
@@ -22,7 +37,7 @@ onMounted(() => {
 
   // 地图加载时
   map.value.on("load", async () => {
-    addTileLayer(map.value as Map, tdt_raster_url)
+    // addTileLayer(map.value as Map, "Raster", tdt_raster_url);
   });
 
   // 点击地图时，获取点击位置的要素
@@ -31,7 +46,6 @@ onMounted(() => {
     let feas = (map.value as Map).queryRenderedFeatures(e.point, {});
     console.log(feas);
   });
-
 });
 
 /**
@@ -69,7 +83,7 @@ function initMap(): Map {
 
 /**
  * 添加控件
- * @param map 
+ * @param map
  */
 function addControllers(map: Map) {
   // 添加常用地图控件

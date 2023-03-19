@@ -43,16 +43,17 @@ export async function addFlatGeoBuf(fgb: any, map: Map) {
 /**
  * 添加geojson数据到地图上
  */
-export function addGeoJson(map: Map, json: String) {
-    map.addSource("GeoJson", {
+export async function addGeoJson(map: Map, sourceName: string, json: String, annoField: String = "") {
+    map.addSource(sourceName, {
         type: "geojson",
         // data: "http://192.168.10.95:8999/geoserver/nansha/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=nansha%3Afield&maxFeatures=40000&outputFormat=application%2Fjson",
         data: json
     });
+    const layerId = sourceName + "-geoJson";
     map.addLayer({
-        id: "geoJson",
+        id: sourceName + "-geoJson",
         type: "fill",
-        source: "GeoJson",
+        source: sourceName,
         layout: {},
         paint: {
             "fill-color": "#088",
@@ -60,17 +61,19 @@ export function addGeoJson(map: Map, json: String) {
             "fill-outline-color": "red",
         },
     });
-    map.addLayer({
-        id: "geoJsonAnno",
-        type: "symbol",
-        source: "GeoJson",
-        layout: {
-            "text-field": "{name}",
-            "text-size": 11
-        },
-    });
-
+    if (annoField) {
+        map.addLayer({
+            id: "geoJsonAnno",
+            type: "symbol",
+            source: "GeoJson",
+            layout: {
+                "text-field": `{${annoField}}`,
+                "text-size": 11
+            },
+        });
+    }
     map.fitBounds(map.getBounds());
+    return map.getLayer(layerId)
 }
 
 /**
@@ -151,17 +154,18 @@ export function markCurrentPos(map: maplibregl.Map) {
  * @param map 
  * @param url 
  */
-export function addTileLayer(map: maplibregl.Map, url: string) {
+export async function addTileLayer(map: maplibregl.Map, layerName: string, url: string) {
     // 添加影像底图
-    map.addSource('raster', {
+    const source = "source-" + layerName;
+    map.addSource(source, {
         type: "raster",
         tiles: [url],
         tileSize: 256
     });
     map.addLayer({
-        id: "raster-layer",
+        id: layerName,
         type: "raster",
-        source: "raster"
+        source: source
     })
-
+    return map.getLayer(layerName)
 }
