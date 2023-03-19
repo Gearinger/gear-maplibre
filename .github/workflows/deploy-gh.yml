@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - main  # replace with your default branch name
+  # 手动触发部署
+  workflow_dispatch:
 jobs:
   deploy:
     runs-on: ubuntu-latest
