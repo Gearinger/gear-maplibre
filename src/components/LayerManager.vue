@@ -105,7 +105,8 @@ async function deleteLayer(layer: Layer) {
 function importfinish() {
   importVisible.value = false;
   console.log(urlModel);
-  if (activeTab.value == "url") {
+  console.log(activeTab.value);
+  if (activeTab.value == 2) {
     switch (urlModel.type) {
       case "Tile":
         addTileLayer(props.map, urlModel.layerName, urlModel.url)
