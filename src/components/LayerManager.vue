@@ -114,7 +114,7 @@ async function deleteLayer(layer: Layer) {
 
 function importfinish() {
   importVisible.value = false;
-  console.log(urlModel);
+  // console.log(urlModel);
   if (activeTab.value == "url") {
     switch (urlModel.type) {
       case "Tile":
@@ -212,28 +212,19 @@ function helpHandle() {
       <div class="layer-manager-layer-list-search">
         <a-row>
           <a-col :span="20">
-            <a-input
-              v-model:value="searchLayerContent"
-              placeholder="Layer Search..."
-            ></a-input>
+            <a-input v-model:value="searchLayerContent" placeholder="Layer Search..."></a-input>
           </a-col>
           <a-col :span="4">
             <a-button block @click="importVisible = true">+</a-button>
             <a-modal v-model:visible="importVisible" @ok="importfinish">
               <a-tabs size="small" v-model:activeKey="activeTab">
                 <a-tab-pane key="1" tab="file">
-                  <div
-                    :class="{
-                      'file-import-area': true,
-                      active: fileAreaActive,
-                    }"
-                    @drop.prevent="dragLoadFile"
-                    @dragleave.prevent="fileAreaActive = false"
-                    @dragover.prevent="fileAreaActive = true"
-                    @dragenter.prevent="fileAreaActive = true"
-                    @click="clickLoadFile"
-                    pr
-                  >
+                  <div :class="{
+                    'file-import-area': true,
+                    active: fileAreaActive,
+                  }" @drop.prevent="dragLoadFile" @dragleave.prevent="fileAreaActive = false"
+                    @dragover.prevent="fileAreaActive = true" @dragenter.prevent="fileAreaActive = true"
+                    @click="clickLoadFile" pr>
                     <p class="file-import-area-icon">
                       <inbox-outlined></inbox-outlined>
                     </p>
@@ -249,33 +240,19 @@ function helpHandle() {
                   </div>
                 </a-tab-pane>
                 <a-tab-pane key="2" tab="url" force-render>
-                  <a-form
-                    :model="urlModel"
-                    :label-col="{ span: 5 }"
-                    style="margin: 20px"
-                  >
+                  <a-form :model="urlModel" :label-col="{ span: 5 }" style="margin: 20px">
                     <a-form-item label="type">
                       <a-select v-model:value="urlModel.type" size="small">
-                        <a-select-option value="GeoJSON"
-                          >GeoJSON</a-select-option
-                        >
+                        <a-select-option value="GeoJSON">GeoJSON</a-select-option>
                         <a-select-option value="Tile">Tile</a-select-option>
-                        <a-select-option value="Vector Tile"
-                          >Vector Tile</a-select-option
-                        >
+                        <a-select-option value="Vector Tile">Vector Tile</a-select-option>
                       </a-select>
                     </a-form-item>
                     <a-form-item label="layerName">
-                      <a-input
-                        v-model:value="urlModel.layerName"
-                        size="small"
-                      ></a-input>
+                      <a-input v-model:value="urlModel.layerName" size="small"></a-input>
                     </a-form-item>
                     <a-form-item label="url">
-                      <a-input
-                        v-model:value="urlModel.url"
-                        size="small"
-                      ></a-input>
+                      <a-input v-model:value="urlModel.url" size="small"></a-input>
                     </a-form-item>
                   </a-form>
                 </a-tab-pane>
@@ -284,28 +261,18 @@ function helpHandle() {
           </a-col>
         </a-row>
       </div>
-      <a-table
-        :dataSource="layerList"
-        :columns="layerFields"
-        size="small"
-        tableLayout="fixed"
-        :pagination="false"
+      <a-table :dataSource="layerList" :columns="layerFields" size="small" tableLayout="fixed" :pagination="false"
         :row-selection="{
           columnWidth: 10,
           selectedRowKeys: selectedLayers,
           onChange: onSelectLayerChange,
           onSelect: onSelectLayer,
-        }"
-      >
+        }">
         <template #operation="{ record }">
-          <a-button
-            shape="circle"
-            danger
-            size="small"
-            type="text"
-            @click="deleteLayer(record)"
-          >
-            <template #icon><DeleteOutlined /></template>
+          <a-button shape="circle" danger size="small" type="text" @click="deleteLayer(record)">
+            <template #icon>
+              <DeleteOutlined />
+            </template>
           </a-button>
         </template>
       </a-table>
@@ -331,6 +298,7 @@ function helpHandle() {
 .layer-manager-menu-top-btn {
   text-align: right;
   font-size: 20px;
+
   * {
     margin-left: 7px;
   }
@@ -353,6 +321,7 @@ function helpHandle() {
   text-align: center;
   border-top: 1px solid rgb(80, 80, 80);
 }
+
 .layer-manager-layer-list-search {
   margin-bottom: 10px;
 }
@@ -377,10 +346,12 @@ function helpHandle() {
   padding: 0%;
   margin: 0%;
 }
+
 .file-import-area-text {
   font-size: 15px;
   opacity: 0.8;
 }
+
 .file-import-area-hint {
   font-size: 9px;
   opacity: 0.5;

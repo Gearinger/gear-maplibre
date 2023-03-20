@@ -1,8 +1,9 @@
 <template lang="">
   <div id="map"></div>
   <!-- <SideMenu :map="map"/> -->
-  <LayerManager :map="map" v-if="() => map && map.loaded()"></LayerManager>
-  <MousePos :map="map" v-if="() => map && map.loaded()"></MousePos>
+  <LayerManager :map="map"></LayerManager>
+  <MousePos :map="map"></MousePos>
+  <FeatureProp :map="map" :visiable="true"></FeatureProp>
 </template>
 
 <script setup lang="ts">
@@ -29,6 +30,7 @@ import { tdt_raster_url } from "../common/Config";
 import SideMenu from "./SideMenu.vue";
 import LayerManager from "./LayerManager.vue";
 import MousePos from "./MousePos.vue";
+import FeatureProp from "./FeatureProp.vue";
 
 const map = ref<Map>();
 
@@ -44,9 +46,7 @@ onMounted(() => {
 
   // 点击地图时，获取点击位置的要素
   map.value.on("click", (e) => {
-    console.log(e);
     let feas = (map.value as Map).queryRenderedFeatures(e.point, {});
-    console.log(feas);
   });
 });
 

@@ -15,7 +15,7 @@ const once = ref(true);
 watch(
   () => prop.map,
   (newValue, oldValue) => {
-    if (once.value) {
+    if (once.value) {      
       prop.map.on("mousemove", function (e) {
         pos.x = e.lngLat.lng.toFixed(7);
         pos.y = e.lngLat.lat.toFixed(7);
