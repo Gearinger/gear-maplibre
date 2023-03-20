@@ -79,32 +79,34 @@ export async function addGeoJson(map: Map, sourceName: string, json: String, ann
 /**
  * 添加pbf数据到地图上
  */
-export function addPbfLayer(map: Map) {
-    map.addSource("pbfLayer", {
+export async function addPbfLayer(map: Map, layerName: string, vectorTileUrl: string, paint: any = undefined) {
+    map.addSource("source-" + layerName, {
         type: "vector",
-        tiles: ["http://127.0.0.1:9005/business/field/pbfLayer/field/1/{z}/{x}/{y}"],
+        // tiles: ["http://127.0.0.1:9005/business/field/pbfLayer/field/1/{z}/{x}/{y}"],
+        tiles: [vectorTileUrl],
     });
     map.addLayer({
-        id: "pbfLayer",
+        id: layerName,
         type: "fill",
-        source: "pbfLayer",
+        source: "source-" + layerName,
         "source-layer": "default",
-        "paint": {
-            "fill-color": [
-                "match",
-                ["get", "name"],
-                ["0403020000"],
-                "#CDEBF2",
-                ["0206000000"],
-                "#F8CDD0",
-                ["0201000000"],
-                "#92D050",
-                "#F39F72",
-            ]
-        }
+        "paint": paint,
+        // "paint": {
+        //     "fill-color": [
+        //         "match",
+        //         ["get", "name"],
+        //         ["0403020000"],
+        //         "#CDEBF2",
+        //         ["0206000000"],
+        //         "#F8CDD0",
+        //         ["0201000000"],
+        //         "#92D050",
+        //         "#F39F72",
+        //     ]
+        // }
     });
     map.fitBounds(map.getBounds());
-    // console.log(map);
+    return map.getLayer(layerName);
 }
 
 

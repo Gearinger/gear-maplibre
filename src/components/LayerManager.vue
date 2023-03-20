@@ -8,7 +8,7 @@ import {
   InboxOutlined,
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
-import { addGeoJson, addTileLayer } from "../common/MaplibreUtil";
+import { addGeoJson, addTileLayer, addPbfLayer } from "../common/MaplibreUtil";
 import { ColumnProps } from "ant-design-vue/lib/table/Column";
 
 interface Props {
@@ -63,7 +63,17 @@ const layerFields = [
 ];
 
 async function clickLoadFile() {
-  const [fileHandle] = await window.showOpenFilePicker();
+  const [fileHandle] = await window.showOpenFilePicker({
+    types: [
+      {
+        accept: {
+          "geojson/*": [".json"],
+        },
+      },
+    ],
+    // 可以选择多个图片
+    multiple: true,
+  });
   const file: File = await fileHandle.getFile();
   await loadFile(file);
   message.success("加载完成！");
@@ -86,7 +96,7 @@ async function loadFile(file) {
     // console.log(file);
     addGeoJson(props.map as Map, file.name, json)
       .then((layer) => {
-        addLayer(layer);
+        addLayerToList(layer);
       })
       .catch((e: Error) => {
         message.error(e.message);
@@ -110,13 +120,31 @@ function importfinish() {
       case "Tile":
         addTileLayer(props.map, urlModel.layerName, urlModel.url)
           .then((layer) => {
-            addLayer(layer);
+            addLayerToList(layer);
             message.success("加载成功！");
           })
           .catch((e: Error) => {
             message.error(e.message);
           });
       case "GeoJSON":
+        addGeoJson(props.map, urlModel.layerName, urlModel.url)
+          .then((layer) => {
+            addLayerToList(layer);
+            message.success("加载成功！");
+          })
+          .catch((e: Error) => {
+            message.error(e.message);
+          });
+        break;
+      case "Vector Tile":
+        addPbfLayer(props.map, urlModel.layerName, urlModel.url)
+          .then((layer) => {
+            addLayerToList(layer);
+            message.success("加载成功！");
+          })
+          .catch((e: Error) => {
+            message.error(e.message);
+          });
         break;
       default:
         break;
@@ -124,7 +152,7 @@ function importfinish() {
   }
 }
 
-function addLayer(layer) {
+function addLayerToList(layer) {
   let key = layerList.value.length;
   layerList.value.push({
     ...layer,
@@ -223,7 +251,7 @@ function helpHandle() {
                 <a-tab-pane key="2" tab="url" force-render>
                   <a-form
                     :model="urlModel"
-                    :label-col="{ span: 3 }"
+                    :label-col="{ span: 5 }"
                     style="margin: 20px"
                   >
                     <a-form-item label="type">
@@ -232,8 +260,8 @@ function helpHandle() {
                           >GeoJSON</a-select-option
                         >
                         <a-select-option value="Tile">Tile</a-select-option>
-                        <a-select-option value="3D Tile"
-                          >3D Tile</a-select-option
+                        <a-select-option value="Vector Tile"
+                          >Vector Tile</a-select-option
                         >
                       </a-select>
                     </a-form-item>
@@ -292,7 +320,7 @@ function helpHandle() {
   position: absolute;
   background-color: @global_bg_color;
   width: 300px;
-  height: 100%;
+  height: calc(100% - 40px);
   margin: 20px;
 }
 
