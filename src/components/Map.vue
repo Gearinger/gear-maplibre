@@ -1,7 +1,8 @@
 <template lang="">
   <div id="map"></div>
   <!-- <SideMenu :map="map"/> -->
-  <LayerManager :map="map"></LayerManager>
+  <LayerManager :map="map" v-if="() => map && map.loaded()"></LayerManager>
+  <MousePos :map="map" v-if="() => map && map.loaded()"></MousePos>
 </template>
 
 <script setup lang="ts">
@@ -27,6 +28,7 @@ import { tdt_raster_url } from "../common/Config";
 
 import SideMenu from "./SideMenu.vue";
 import LayerManager from "./LayerManager.vue";
+import MousePos from "./MousePos.vue";
 
 const map = ref<Map>();
 
