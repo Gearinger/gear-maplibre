@@ -4,10 +4,12 @@
   <LayerManager :map="map"></LayerManager>
   <MousePos :map="map"></MousePos>
   <FeatureProp :map="map" :visiable="true"></FeatureProp>
+  <Draw :map="map"></Draw>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
+import maplibregl from "maplibre-gl"
 import {
   Feature,
   Map,
@@ -17,7 +19,8 @@ import {
   MapLayerEventType,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
+import MaplibreGeocoder from '@maplibre/maplibre-gl-geocoder';
+import '@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css';
 import {
   drawAnno,
   markCurrentPos,
@@ -31,8 +34,52 @@ import SideMenu from "./SideMenu.vue";
 import LayerManager from "./LayerManager.vue";
 import MousePos from "./MousePos.vue";
 import FeatureProp from "./FeatureProp.vue";
+import Draw from "./Draw.vue";
+import { IFeature } from "flatgeobuf";
 
 const map = ref<Map>();
+
+var geocoder_api = {
+  forwardGeocode: async (config) => {
+    const features: any = [];
+    try {
+      let request =
+        'https://nominatim.openstreetmap.org/search?q=' +
+        config.query +
+        '&format=geojson&polygon_geojson=1&addressdetails=1';
+      const response = await fetch(request);
+      const geojson = await response.json();
+      for (let feature of geojson.features) {
+        let center = [
+          feature.bbox[0] +
+          (feature.bbox[2] - feature.bbox[0]) / 2,
+          feature.bbox[1] +
+          (feature.bbox[3] - feature.bbox[1]) / 2
+        ];
+        let point = {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: center
+          },
+          place_name: feature.properties.display_name,
+          properties: feature.properties,
+          text: feature.properties.display_name,
+          place_type: ['place'],
+          center: center
+        };
+        features.push(point);
+      }
+    } catch (e) {
+      console.error(`Failed to forwardGeocode with error: ${e}`);
+    }
+
+    return {
+      features: features
+    };
+  }
+};
+
 
 // 挂载时初始化地图
 onMounted(() => {
@@ -88,6 +135,13 @@ function initMap(): Map {
  * @param map
  */
 function addControllers(map: Map) {
+
+  map.addControl(
+    new MaplibreGeocoder(geocoder_api, {
+      maplibregl: maplibregl
+    })
+  );
+
   // 添加常用地图控件
   map.addControl(new NavigationControl({}));
 }

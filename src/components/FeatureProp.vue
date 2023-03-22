@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Map, MapGeoJSONFeature } from "maplibre-gl";
 import { ref, reactive, watch } from "vue";
+import { feature } from '@turf/turf';
 
 interface Props {
     map: Map;
@@ -12,10 +13,10 @@ interface DisplayFeature {
     type: string,
     properties: string,
     id: string,
-    source: string
+    source: string,
+    geojson: string
 }
 
-const activeKey = ref("1");
 const currentFeature = ref<DisplayFeature>()
 
 var selectFeatureList = ref<DisplayFeature[]>([]);
@@ -25,12 +26,15 @@ async function addFeatureSelectEvent() {
         let features = props.map.queryRenderedFeatures(e.point);
         selectFeatureList.value = []
         features.forEach(feat => {
+            console.log(feat.toJSON());
+
             selectFeatureList.value.push(
                 {
                     type: feat['type'],
                     properties: JSON.stringify(feat['properties']),
                     id: feat['id']?.toString() ?? '0',
                     source: feat['source'],
+                    geojson: JSON.stringify(feature(feat.geometry)),
                 }
             );
         })
@@ -59,8 +63,7 @@ watch(
 
 <template>
     <div class="feature-prop" v-if="visiable && selectFeatureList.length">
-        <a-tabs v-model:activeKey="activeKey" size="small"
-            @change="currentFeature = selectFeatureList.find(p => p.id == activeKey)">
+        <a-tabs size="small">
             <a-tab-pane v-for="item, index in selectFeatureList" :key="index" :tab="item.source">
                 <a-form :model="item" :label-col="{ span: 6 }" @finish="onFinish" @finishFailed="onFinishFailed">
                     <a-form-item label="id" name="id">
@@ -74,6 +77,11 @@ watch(
                     </a-form-item>
                     <a-form-item label="properties" name="properties">
                         <a-textarea :value="item?.properties" :rows="8" placeholder="maxlength is 6" :maxlength="6">
+                        </a-textarea>
+
+                    </a-form-item>
+                    <a-form-item label="geojson" name="geojson">
+                        <a-textarea :value="item?.geojson" :rows="8" placeholder="maxlength is 6" :maxlength="6">
                         </a-textarea>
 
                     </a-form-item>

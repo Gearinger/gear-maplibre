@@ -67,7 +67,7 @@ async function clickLoadFile() {
     types: [
       {
         accept: {
-          "geojson/*": [".json"],
+          "geojson/*": [".json", ".geojson"],
         },
       },
     ],
@@ -75,6 +75,7 @@ async function clickLoadFile() {
     multiple: true,
   });
   const file: File = await fileHandle.getFile();
+  importVisible.value = false
   await loadFile(file);
   message.success("加载完成！");
 }
