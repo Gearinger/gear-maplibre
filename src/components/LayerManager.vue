@@ -114,23 +114,23 @@ async function deleteLayer(layer: Layer) {
 
 function importfinish() {
   importVisible.value = false;
-  // console.log(urlModel);
-  if (activeTab.value == "url") {
+  if (activeTab.value == 2) {
     switch (urlModel.type) {
       case "Tile":
         addTileLayer(props.map, urlModel.layerName, urlModel.url)
           .then((layer) => {
             addLayerToList(layer);
-            message.success("加载成功！");
+            message.success("Tile加载成功！");
           })
           .catch((e: Error) => {
             message.error(e.message);
           });
+        break;
       case "GeoJSON":
         addGeoJson(props.map, urlModel.layerName, urlModel.url)
           .then((layer) => {
             addLayerToList(layer);
-            message.success("加载成功！");
+            message.success("GeoJSON加载成功！");
           })
           .catch((e: Error) => {
             message.error(e.message);
@@ -140,7 +140,7 @@ function importfinish() {
         addPbfLayer(props.map, urlModel.layerName, urlModel.url)
           .then((layer) => {
             addLayerToList(layer);
-            message.success("加载成功！");
+            message.success("Vector Tile加载成功！");
           })
           .catch((e: Error) => {
             message.error(e.message);
