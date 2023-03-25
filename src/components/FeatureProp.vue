@@ -1,43 +1,75 @@
 <script setup lang="ts">
-import { Map, MapGeoJSONFeature } from "maplibre-gl";
+import { GeoJSONFeature, GeoJSONSource, Map, MapGeoJSONFeature, Source } from "maplibre-gl";
 import { ref, reactive, watch } from "vue";
-import { feature } from '@turf/turf';
+import { FeatureCollection, feature } from '@turf/turf';
 
 interface Props {
     map: Map;
-    visiable: boolean;
 }
+
 const props = defineProps<Props>();
 
 interface DisplayFeature {
     type: string,
-    properties: string,
+    properties: {},
     id: string,
     source: string,
     geojson: string
 }
 
-const currentFeature = ref<DisplayFeature>()
-
 var selectFeatureList = ref<DisplayFeature[]>([]);
+const activeKey = ref(0);
+const descriptionVisiable = ref(false)
 
 async function addFeatureSelectEvent() {
     props.map.on("mouseup", function (e) {
+        descriptionVisiable.value = false;
         let features = props.map.queryRenderedFeatures(e.point);
         selectFeatureList.value = []
         features.forEach(feat => {
-            console.log(feat.toJSON());
-
             selectFeatureList.value.push(
                 {
                     type: feat['type'],
-                    properties: JSON.stringify(feat['properties']),
+                    properties: feat['properties'],
                     id: feat['id']?.toString() ?? '0',
                     source: feat['source'],
                     geojson: JSON.stringify(feature(feat.geometry)),
                 }
             );
         })
+        descriptionVisiable.value = true;
+
+        // console.log(features);
+    });
+}
+
+async function propChangeHandle(e: InputEvent, prop: string, key) {
+    prop = prop.toString()
+    let currentFeat = selectFeatureList.value[activeKey.value];
+    console.log(e);
+
+    if (e.data) {
+        currentFeat.properties[key] = prop + e.data;
+    }
+    if (e.inputType == "deleteContentBackward") {
+        currentFeat.properties[key] = prop.substring(0, prop.length - 1);
+    }
+    const source = props.map.getSource(currentFeat.source) as GeoJSONSource;
+    let data = source._data as FeatureCollection;
+    const features = []
+    for (let i = 0; i < data.features.length; i++) {
+        let feature = data.features[i];
+        if (i.toString() == currentFeat.id) {
+            feature = {
+                ...feature,
+                properties: currentFeat.properties
+            };
+        }
+        features.push(feature)
+    }
+    source.setData({
+        ...data,
+        features
     });
 }
 
@@ -54,8 +86,8 @@ watch(
 </script>
 
 <template>
-    <div class="feature-prop" v-if="visiable && selectFeatureList.length">
-        <a-tabs size="small">
+    <div class="feature-prop" v-if="descriptionVisiable && selectFeatureList.length">
+        <a-tabs size="small" v-model:activeKey="activeKey">
             <a-tab-pane v-for="item, index in selectFeatureList" :key="index" :tab="item.source">
                 <a-descriptions :column="1" size="small" bordered>
                     <a-descriptions-item label="id">
@@ -67,11 +99,10 @@ watch(
                     <a-descriptions-item label="source">
                         {{ item?.source }}
                     </a-descriptions-item>
-                    <a-descriptions-item class="feature-prop-textarea" label="properties">
-                        <a-textarea :value="item?.properties" :rows="8" placeholder="maxlength is 6" :maxlength="6">
-                        </a-textarea>
+                    <a-descriptions-item v-for="prop, key of item?.properties " :label="key">
+                        <a-input :value="item.properties[key]" @change="e => propChangeHandle(e, prop, key)"></a-input>
                     </a-descriptions-item>
-                    <a-descriptions-item class="feature-prop-textarea" label="geojson">
+                    <a-descriptions-item :disable="true" class="feature-prop-textarea" label="geojson">
                         <a-textarea :value="item?.geojson" :rows="8" placeholder="maxlength is 6" :maxlength="6">
                         </a-textarea>
                     </a-descriptions-item>
@@ -102,9 +133,13 @@ watch(
             white-space: normal;
         }
     }
+
+    a-descriptions {
+        max-height: 70%;
+    }
 }
 
-td.ant-descriptions-item-content.feature-prop-textarea{
+td.ant-descriptions-item-content.feature-prop-textarea {
     padding: 0%;
 }
 </style>

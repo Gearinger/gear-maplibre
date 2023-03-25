@@ -47,7 +47,8 @@ export async function addGeoJson(map: Map, sourceName: string, json: String, ann
     map.addSource(sourceName, {
         type: "geojson",
         // data: "http://192.168.10.95:8999/geoserver/nansha/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=nansha%3Afield&maxFeatures=40000&outputFormat=application%2Fjson",
-        data: json
+        data: json,
+        generateId: true,
     });
     const layerId = sourceName + "-geoJson";
     map.addLayer({

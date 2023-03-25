@@ -3,7 +3,7 @@
   <!-- <SideMenu :map="map"/> -->
   <LayerManager :map="map"></LayerManager>
   <MousePos :map="map"></MousePos>
-  <FeatureProp :map="map" :visiable="true"></FeatureProp>
+  <FeatureProp :map="map"></FeatureProp>
   <Draw :map="map"></Draw>
 </template>
 
