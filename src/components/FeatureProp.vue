@@ -41,14 +41,6 @@ async function addFeatureSelectEvent() {
     });
 }
 
-async function onFinish() {
-
-}
-
-function onFinishFailed() {
-
-}
-
 const once = ref(true);
 watch(
     () => props.map,
@@ -65,27 +57,25 @@ watch(
     <div class="feature-prop" v-if="visiable && selectFeatureList.length">
         <a-tabs size="small">
             <a-tab-pane v-for="item, index in selectFeatureList" :key="index" :tab="item.source">
-                <a-form :model="item" :label-col="{ span: 6 }" @finish="onFinish" @finishFailed="onFinishFailed">
-                    <a-form-item label="id" name="id">
+                <a-descriptions :column="1" size="small" bordered>
+                    <a-descriptions-item label="id">
                         {{ item?.id }}
-                    </a-form-item>
-                    <a-form-item label="type" name="type">
+                    </a-descriptions-item>
+                    <a-descriptions-item label="type">
                         {{ item?.type }}
-                    </a-form-item>
-                    <a-form-item label="source" name="source">
+                    </a-descriptions-item>
+                    <a-descriptions-item label="source">
                         {{ item?.source }}
-                    </a-form-item>
-                    <a-form-item label="properties" name="properties">
+                    </a-descriptions-item>
+                    <a-descriptions-item class="feature-prop-textarea" label="properties">
                         <a-textarea :value="item?.properties" :rows="8" placeholder="maxlength is 6" :maxlength="6">
                         </a-textarea>
-
-                    </a-form-item>
-                    <a-form-item label="geojson" name="geojson">
+                    </a-descriptions-item>
+                    <a-descriptions-item class="feature-prop-textarea" label="geojson">
                         <a-textarea :value="item?.geojson" :rows="8" placeholder="maxlength is 6" :maxlength="6">
                         </a-textarea>
-
-                    </a-form-item>
-                </a-form>
+                    </a-descriptions-item>
+                </a-descriptions>
             </a-tab-pane>
         </a-tabs>
     </div>
@@ -99,7 +89,7 @@ watch(
     bottom: 15%;
     right: 55px;
     height: 70%;
-    width: 18%;
+    width: 23%;
     background-color: @global_bg_color;
     padding: @gobal_padding;
 
@@ -112,5 +102,9 @@ watch(
             white-space: normal;
         }
     }
+}
+
+td.ant-descriptions-item-content.feature-prop-textarea{
+    padding: 0%;
 }
 </style>
