@@ -156,8 +156,10 @@ function importfinish() {
 function addLayerToList(layer) {
   let key = layerList.value.length;
   layerList.value.push({
-    ...layer,
     key: key,
+    id: layer.id,
+    type: layer.type,
+    source: layer.source
   });
   selectedLayers.value.push(key);
 }

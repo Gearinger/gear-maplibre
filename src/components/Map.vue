@@ -8,15 +8,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, ref } from "vue";
 import maplibregl from "maplibre-gl"
 import {
-  Feature,
   Map,
   StyleSpecification,
   NavigationControl,
-  GeoJSONFeature,
-  MapLayerEventType,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import MaplibreGeocoder from '@maplibre/maplibre-gl-geocoder';
@@ -28,14 +25,11 @@ import {
   addGeoJson,
   addTileLayer,
 } from "../common/MaplibreUtil";
-import { tdt_raster_url } from "../common/Config";
 
-import SideMenu from "./SideMenu.vue";
 import LayerManager from "./LayerManager.vue";
 import MousePos from "./MousePos.vue";
 import FeatureProp from "./FeatureProp.vue";
 import Draw from "./Draw.vue";
-import { IFeature } from "flatgeobuf";
 
 const map = ref<Map>();
 
