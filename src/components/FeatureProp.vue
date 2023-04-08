@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { GeoJSONFeature, GeoJSONSource, Map, MapGeoJSONFeature, Source } from "maplibre-gl";
 import { ref, reactive, watch } from "vue";
-import { FeatureCollection, feature } from '@turf/turf';
+import { FeatureCollection, Geometry, feature } from '@turf/turf';
+import { Feature } from "flatgeobuf";
 
 interface Props {
     map: Map;
@@ -56,7 +57,7 @@ async function propChangeHandle(e: InputEvent, prop: string, key) {
     }
     const source = props.map.getSource(currentFeat.source) as GeoJSONSource;
     let data = source._data as FeatureCollection;
-    const features = []
+    const features: any[] = []
     for (let i = 0; i < data.features.length; i++) {
         let feature = data.features[i];
         if (i.toString() == currentFeat.id) {
