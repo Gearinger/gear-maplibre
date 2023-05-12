@@ -115,11 +115,11 @@ function initMap(): Map {
   // 初始化地图
   var map = new Map({
     container: "map", // container id
-    // style: "https://demotiles.maplibre.org/style.json", // style URL
+    style: "https://demotiles.maplibre.org/style.json", // style URL
     // style: "https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL",
-    style: blankStyle,
-    center: [113.46, 22.88], // starting position [lng, lat]
-    zoom: 9, // starting zoom
+    // style: blankStyle,
+    center: [103, 38], // starting position [lng, lat]
+    zoom: 3, // starting zoom
   });
   return map;
 }
