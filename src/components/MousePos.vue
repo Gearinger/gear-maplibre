@@ -36,9 +36,11 @@ watch(
 @import "../assets/main.less";
 
 .mouse-pos {
+  z-index: 999;
   position: absolute;
   right: 50px;
   bottom: 20px;
   color: @global_front_color;
+  text-shadow: 1px 1px 5px @global_shadow_color;
 }
 </style>

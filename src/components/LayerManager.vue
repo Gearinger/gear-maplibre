@@ -34,6 +34,10 @@ let selectedLayers = ref<Key[]>([]);
 let importVisible = ref(false);
 let fileAreaActive = ref(false);
 let activeTab = ref();
+const textModel = ref({
+  type: "GeoJSON",
+  content: "",
+});
 
 const urlModel = reactive({
   type: "Tile",
@@ -199,15 +203,6 @@ function helpHandle() {
             </a-tooltip>
           </a-col>
         </a-row>
-        <a-form-item label="Activity name">
-          <a-input />
-        </a-form-item>
-        <a-form-item label="Activity zone">
-          <a-select placeholder="please select your zone">
-            <a-select-option value="shanghai">Zone one</a-select-option>
-            <a-select-option value="beijing">Zone two</a-select-option>
-          </a-select>
-        </a-form-item>
       </a-form>
     </div>
 
@@ -247,8 +242,10 @@ function helpHandle() {
                     <a-form-item label="type">
                       <a-select v-model:value="urlModel.type" size="small">
                         <a-select-option value="GeoJSON">GeoJSON</a-select-option>
-                        <a-select-option value="Tile">Tile</a-select-option>
+                        <a-select-option value="Tile">XYZ-Tile</a-select-option>
                         <a-select-option value="Vector Tile">Vector Tile</a-select-option>
+                        <a-select-option value="3D Tiles">3D Tiles</a-select-option>
+                        <a-select-option value="Terrain">Terrain</a-select-option>
                       </a-select>
                     </a-form-item>
                     <a-form-item label="layerName">
@@ -256,6 +253,19 @@ function helpHandle() {
                     </a-form-item>
                     <a-form-item label="url">
                       <a-input v-model:value="urlModel.url" size="small"></a-input>
+                    </a-form-item>
+                  </a-form>
+                </a-tab-pane>
+                <a-tab-pane key="3" tab="text" force-render>
+                  <a-form :model="textModel" :label-col="{ span: 5 }" style="margin: 20px">
+                    <a-form-item label="type">
+                      <a-select v-model:value="textModel.type" size="small">
+                        <a-select-option value="GeoJSON"></a-select-option>
+                        <a-select-option value="WKT"></a-select-option>
+                      </a-select>
+                    </a-form-item>
+                    <a-form-item label="content">
+                      <a-textarea v-model:value="textModel.content" size="small" style="height: 200px"></a-textarea>
                     </a-form-item>
                   </a-form>
                 </a-tab-pane>
