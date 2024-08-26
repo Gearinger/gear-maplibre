@@ -43,7 +43,7 @@ export async function addFlatGeoBuf(fgb: any, map: Map) {
 /**
  * 添加geojson数据到地图上
  */
-export async function addGeoJson(map: Map, sourceName: string, json: String, annoField: String = "") {
+export async function addGeoJson(map: Map, sourceName: string, json: String|Object, annoField: String = "") {
     map.addSource(sourceName, {
         type: "geojson",
         // data: "http://192.168.10.95:8999/geoserver/nansha/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=nansha%3Afield&maxFeatures=40000&outputFormat=application%2Fjson",

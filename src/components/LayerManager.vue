@@ -10,6 +10,7 @@ import {
 import { message } from "ant-design-vue";
 import { addGeoJson, addTileLayer, addPbfLayer } from "../common/MaplibreUtil";
 import { ColumnProps } from "ant-design-vue/lib/table/Column";
+import turf from '@turf/turf'
 
 interface Props {
   map: Map;
@@ -34,7 +35,7 @@ let selectedLayers = ref<Key[]>([]);
 let importVisible = ref(false);
 let fileAreaActive = ref(false);
 let activeTab = ref();
-const textModel = ref({
+const textModel = reactive({
   type: "GeoJSON",
   content: "",
 });
@@ -125,7 +126,7 @@ function importfinish() {
         addTileLayer(props.map, urlModel.layerName, urlModel.url)
           .then((layer) => {
             addLayerToList(layer);
-            message.success("Tile加载成功！");
+            message.success("XYZ-Tile加载成功！");
           })
           .catch((e: Error) => {
             message.error(e.message);
@@ -152,6 +153,20 @@ function importfinish() {
           });
         break;
       default:
+        break;
+    }
+  }
+  if (activeTab.value == 3) {
+    switch (textModel.type) {
+      case "GeoJSON":
+        addGeoJson(props.map, Date.now().toString(), JSON.parse(textModel.content))
+          .then((layer) => {
+            addLayerToList(layer);
+            message.success("GeoJSON加载成功！");
+          })
+          .catch((e: Error) => {
+            message.error(e.message);
+          });
         break;
     }
   }
@@ -261,7 +276,6 @@ function helpHandle() {
                     <a-form-item label="type">
                       <a-select v-model:value="textModel.type" size="small">
                         <a-select-option value="GeoJSON"></a-select-option>
-                        <a-select-option value="WKT"></a-select-option>
                       </a-select>
                     </a-form-item>
                     <a-form-item label="content">

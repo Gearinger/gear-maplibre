@@ -38,7 +38,7 @@ async function addFeatureSelectEvent() {
         })
         descriptionVisiable.value = true;
 
-        // console.log(features);
+        console.log(features);
     });
 }
 
