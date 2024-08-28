@@ -24,8 +24,11 @@ jobs:
           node-version: '16'
 
       # 安装依赖
+      - name: Install pnpm
+        run: npm i -g pnpm
+        
       - name: Install dependencies
-        run: npm i
+        run: pnpm i
 
       - name: Install vite
         run: npm i -g vite
