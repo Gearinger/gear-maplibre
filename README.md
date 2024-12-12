@@ -13,22 +13,22 @@ https://gearinger.github.io/gear-maplibre/
 ### 已支持格式
 
 - 文件
--   geojson
+  - geojson
 - url
--   geojson
--   xyz
--   mvt(pbf)
+  - geojson
+  - xyz
+  - mvt(pbf)
 - 文本
--   geojson
+  - geojson
 
 ### 待支持格式
 
 - 文件
--   shp
--   gltf
+  - flatgeobuf
+  - gltf
 - url
--   3dtiles
--   gltf
--   terrain
+  - 3dtiles
+  - gltf
+  - terrain
 - 文本
--   wkt
+  - wkt
