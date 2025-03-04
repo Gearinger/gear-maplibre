@@ -5,6 +5,8 @@
   <MousePos :map="map"></MousePos>
   <FeatureProp :map="map"></FeatureProp>
   <Draw :map="map"></Draw>
+  <tile-grid :map="map"></tile-grid>
+  <SingleTileLoad :map="map"></SingleTileLoad>
 </template>
 
 <script setup lang="ts">
@@ -30,6 +32,8 @@ import LayerManager from "./LayerManager.vue";
 import MousePos from "./MousePos.vue";
 import FeatureProp from "./FeatureProp.vue";
 import Draw from "./Draw.vue";
+import TileGrid from "./TileGrid.vue";
+import SingleTileLoad from "./SingleTileLoad.vue";
 
 const map = ref<Map>();
 
