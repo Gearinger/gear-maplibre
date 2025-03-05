@@ -49,7 +49,7 @@ const addTileLayer = () => {
         console.log(bounds);
 
         if (props.map.getSource('single-tile')) {
-            var layerIds = props.map.getSource('single-tile')?.vectorLayerIds??[];
+            var layerIds = props.map.getSource('single-tile')?.vectorLayerIds ?? [];
             for (const layerId of layerIds) {
                 props.map.removeLayer('single-tile-layer');
             }
@@ -187,18 +187,31 @@ const handleKeyPress = (event: KeyboardEvent) => {
         <div v-if="showModal" class="modal">
             <div class="modal-content">
                 <span @click="closeModal" class="close">&times;</span>
-                <input v-model="tileUrl" @keypress="handleKeyPress" placeholder="瓦片url格式需满足/z/x/y.{format}" />
+                <input style="width: 30rem;" v-model="tileUrl" @keypress="handleKeyPress" placeholder="瓦片url格式需满足/z/x/y.{format}" />
             </div>
         </div>
     </div>
 </template>
 
 <style lang="less">
+@import "../assets/main.less";
+
 .single-tile-load {
     z-index: 999;
     position: absolute;
-    left: 30%;
-    top: 40px;
+    left: 350px;
+    top: 20px;
     text-shadow: 1px 1px 5px black;
+    background-color: @global_bg_color;
+    border-radius: 0.5rem;
+    display: flex;
+
+    * {
+        border: transparent;
+        background-color: @global_bg_color;
+        color: @global_front_color;
+        border-radius: 0.5rem;
+        margin: 0.5rem;
+    }
 }
 </style>
