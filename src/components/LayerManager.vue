@@ -118,7 +118,7 @@ async function deleteLayer(layer: Layer) {
   message.success("图层删除成功！");
 }
 
-function importfinish() {
+async function importfinish() {
   importVisible.value = false;
   if (activeTab.value == 2) {
     switch (urlModel.type) {
@@ -152,6 +152,28 @@ function importfinish() {
             message.error(e.message);
           });
         break;
+      case "Martin Catalog":
+        let mainName = urlModel.layerName;
+        let martinCatalogUrl = urlModel.url;
+        let catalog = await (await fetch(martinCatalogUrl)).json()
+        console.log(catalog);
+
+        let layerMap = catalog["tiles"];
+        for (const layerName, layer of layerMap.entries) {
+          switch (layer.get("content_type")) {
+            case "application/x-protobuf":
+              addPbfLayer(props.map, mainName + "-" + layerName, martinCatalogUrl.replace("catalog", layerName) + "/z/x/y")
+                .then((layer) => {
+                  addLayerToList(layer);
+                  message.success("Vector Tile加载成功！");
+                })
+                .catch((e: Error) => {
+                  message.error(e.message);
+                });
+              break;
+          }
+        }
+
       default:
         break;
     }
@@ -261,6 +283,7 @@ function helpHandle() {
                         <a-select-option value="Vector Tile">Vector Tile</a-select-option>
                         <a-select-option value="3D Tiles">3D Tiles</a-select-option>
                         <a-select-option value="Terrain">Terrain</a-select-option>
+                        <a-select-option value="Martin Catalog">Martin Catalog</a-select-option>
                       </a-select>
                     </a-form-item>
                     <a-form-item label="layerName">
