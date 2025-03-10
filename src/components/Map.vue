@@ -87,6 +87,15 @@ onMounted(() => {
   // 地图加载时
   map.value.on("load", async () => {
     // addTileLayer(map.value as Map, "Raster", tdt_raster_url);
+    (map.value as Map).addLayer({
+          id: 'data_poi.1',
+          type: 'circle',
+          source: {
+            type: 'vector',
+            url: 'http://localhost:3000/data_poi.1'
+          },
+          'source-layer': 'data_poi.1'
+        });
   });
 
   // 点击地图时，获取点击位置的要素

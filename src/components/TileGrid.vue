@@ -21,8 +21,7 @@ watch(
                 // 计算窗口范围内的瓦片坐标，并显示出每个瓦片的范围
                 const bounds = props.map.getBounds();
                 const zoom = Math.floor(props.map.getZoom() + 1);
-                console.log(zoom);
-
+                // console.log(zoom);
                 const tiles: { x: number; y: number; zoom: number }[] = [];
                 const lngToTile = (lng: number, zoom: number) => Math.floor((lng + 180) / 360 * Math.pow(2, zoom));
                 const latToTile = (lat: number, zoom: number) => Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));

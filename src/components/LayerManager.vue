@@ -156,21 +156,23 @@ async function importfinish() {
         let mainName = urlModel.layerName;
         let martinCatalogUrl = urlModel.url;
         let catalog = await (await fetch(martinCatalogUrl)).json()
-        console.log(catalog);
-
+        console.log("Martin Catalog content:", catalog);
         let layerMap = catalog["tiles"];
-        for (const layerName, layer of layerMap.entries) {
-          switch (layer.get("content_type")) {
-            case "application/x-protobuf":
-              addPbfLayer(props.map, mainName + "-" + layerName, martinCatalogUrl.replace("catalog", layerName) + "/z/x/y")
-                .then((layer) => {
-                  addLayerToList(layer);
-                  message.success("Vector Tile加载成功！");
-                })
-                .catch((e: Error) => {
-                  message.error(e.message);
-                });
-              break;
+        for (const layerName in layerMap) {
+          if (Object.prototype.hasOwnProperty.call(layerMap, layerName)) {
+            const layer = layerMap[layerName];
+            switch (layer["content_type"]) {
+              case "application/x-protobuf":
+                addPbfLayer(props.map, layerName, martinCatalogUrl.replace("catalog", layerName))
+                  .then((layer) => {
+                    addLayerToList(layer);
+                    message.success("Vector Tile加载成功！");
+                  })
+                  .catch((e: Error) => {
+                    message.error(e.message);
+                  });
+                break;
+            }
           }
         }
 
