@@ -38,24 +38,24 @@ async function importKMLFile() {
 
 <template>
   <div class="map-menu">
+    <h3>导入数据</h3>
     <a-radio-group size="small" type="text">
       <a-radio-button value="" @click="importGeoJson">GeoJSON</a-radio-button>
       <a-radio-button value="" @click="importShpFile">ShpFile</a-radio-button>
       <a-radio-button value="" @click="importKMLFile">KML</a-radio-button>
     </a-radio-group>
-
-    <h3>LayerManager</h3>
   </div>
 </template>
 
 <style lang="less">
 .map-menu {
   position: absolute;
+  right: 20px;
   margin: 20px;
   width: 500px;
 
   * {
-    z-index: 9;
+    z-index: 999;
   }
 }
 </style>

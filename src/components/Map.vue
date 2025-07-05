@@ -1,10 +1,10 @@
 <template lang="">
   <div id="map"></div>
-  <!-- <SideMenu :map="map"/> -->
+  <SideMenu :map="map"/>
   <LayerManager :map="map"></LayerManager>
   <MousePos :map="map"></MousePos>
   <FeatureProp :map="map"></FeatureProp>
-  <Draw :map="map"></Draw>
+  <!--<Draw :map="map"></Draw>-->
   <tile-grid :map="map"></tile-grid>
   <SingleTileLoad :map="map"></SingleTileLoad>
 </template>
@@ -34,6 +34,7 @@ import FeatureProp from "./FeatureProp.vue";
 import Draw from "./Draw.vue";
 import TileGrid from "./TileGrid.vue";
 import SingleTileLoad from "./SingleTileLoad.vue";
+import SideMenu from "./SideMenu.vue";
 
 const map = ref<Map>();
 
