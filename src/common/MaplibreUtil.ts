@@ -81,17 +81,19 @@ export async function addGeoJson(map: Map, sourceName: string, json: String|Obje
  * 添加pbf数据到地图上
  */
 export async function addPbfLayer(map: Map, layerName: string, vectorTileUrl: string, paint: any = undefined) {
+    console.log(vectorTileUrl);
+    
     map.addSource("source-" + layerName, {
         type: "vector",
         // tiles: ["http://127.0.0.1:9005/business/field/pbfLayer/field/1/{z}/{x}/{y}"],
-        tiles: [vectorTileUrl],
+        url: vectorTileUrl
     });
     map.addLayer({
         id: layerName,
-        type: "fill",
+        type: "circle",
         source: "source-" + layerName,
-        "source-layer": "default",
-        "paint": paint,
+        "source-layer": layerName,
+        // "paint": paint,
         // "paint": {
         //     "fill-color": [
         //         "match",
@@ -105,8 +107,9 @@ export async function addPbfLayer(map: Map, layerName: string, vectorTileUrl: st
         //         "#F39F72",
         //     ]
         // }
-    });
-    map.fitBounds(map.getBounds());
+    }).fitBounds(map.getBounds());
+    console.log(map.getLayer(layerName));
+
     return map.getLayer(layerName);
 }
 
