@@ -5,16 +5,19 @@ import { onMounted, onActivated } from "vue";
 import { message } from "ant-design-vue";
 
 interface Props {
-  map: Map;
-  name: String;
+  map: Map | undefined;
 }
 
 const props = defineProps<Props>();
 
 async function importGeoJson() {
   console.log(props.map);
-  console.log(props.name);
 
+  // Check if the browser supports the File System Access API
+  if (!window.showOpenFilePicker) {
+    message.error("当前浏览器不支持文件选择功能，请使用支持的浏览器。");
+    return;
+  }
   const [fileHandle] = await window.showOpenFilePicker();
   const file = await fileHandle.getFile();
 

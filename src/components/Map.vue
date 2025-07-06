@@ -1,6 +1,6 @@
-<template lang="">
+<template>
   <div id="map"></div>
-  <SideMenu :map="map"/>
+  <TopMenu :map="map" :name="123"/>
   <LayerManager :map="map"></LayerManager>
   <MousePos :map="map"></MousePos>
   <FeatureProp :map="map"></FeatureProp>
@@ -34,7 +34,7 @@ import FeatureProp from "./FeatureProp.vue";
 import Draw from "./Draw.vue";
 import TileGrid from "./TileGrid.vue";
 import SingleTileLoad from "./SingleTileLoad.vue";
-import SideMenu from "./SideMenu.vue";
+import TopMenu from "./TopMenu.vue";
 
 const map = ref<Map>();
 

@@ -11,6 +11,7 @@ import { message } from "ant-design-vue";
 import { addGeoJson, addTileLayer, addPbfLayer } from "../common/MaplibreUtil";
 import { ColumnProps } from "ant-design-vue/lib/table/Column";
 import turf from '@turf/turf'
+import FileSelect from "./FileSelect.vue";
 
 interface Props {
   map: Map;
@@ -67,48 +68,16 @@ const layerFields = [
   },
 ];
 
-async function clickLoadFile() {
-  const [fileHandle] = await window.showOpenFilePicker({
-    types: [
-      {
-        accept: {
-          "geojson/*": [".json", ".geojson"],
-        },
-      },
-    ],
-    // 可以选择多个图片
-    multiple: true,
-  });
-  const file: File = await fileHandle.getFile();
-  importVisible.value = false
-  await loadFile(file);
-  message.success("加载完成！");
-}
-
-async function dragLoadFile(e) {
-  let files: File[] = e.dataTransfer.files;
-  // console.log(files);
-  for (const file of files) {
-    await loadFile(file);
-  }
-  message.success("加载完成！");
-}
-
-async function loadFile(file) {
-  const reader = new FileReader();
-  reader.addEventListener("load", async () => {
-    let txt = reader.result as string;
-    let json = JSON.parse(txt);
-    // console.log(file);
-    addGeoJson(props.map as Map, file.name, json)
-      .then((layer) => {
-        addLayerToList(layer);
-      })
-      .catch((e: Error) => {
-        message.error(e.message);
-      });
-  });
-  reader.readAsText(file);
+async function loadFile(fileName: string, reader: FileReader) {
+  let txt = reader.result as string;
+  let json = JSON.parse(txt);
+  addGeoJson(props.map as Map, fileName, json)
+    .then((layer) => {
+      addLayerToList(layer);
+    })
+    .catch((e: Error) => {
+      message.error(e.message);
+    });
 }
 
 async function deleteLayer(layer: Layer) {
@@ -232,25 +201,7 @@ function helpHandle() {
             <a-modal v-model:visible="importVisible" @ok="importfinish">
               <a-tabs size="small" v-model:activeKey="activeTab">
                 <a-tab-pane key="1" tab="file">
-                  <div :class="{
-                    'file-import-area': true,
-                    active: fileAreaActive,
-                  }" @drop.prevent="dragLoadFile" @dragleave.prevent="fileAreaActive = false"
-                    @dragover.prevent="fileAreaActive = true" @dragenter.prevent="fileAreaActive = true"
-                    @click="clickLoadFile" pr>
-                    <p class="file-import-area-icon">
-                      <inbox-outlined></inbox-outlined>
-                    </p>
-                    <p class="file-import-area-text">
-                      Click or drag file to this area to load
-                    </p>
-                    <p class="file-import-area-hint">
-                      Support for a single or multy files. Coordinate system
-                      must be 'EPSG:4326'
-                      <br />
-                      *.json ( GeoJSON ) | *.shp ( ShpFile )
-                    </p>
-                  </div>
+                  <FileSelect @load-file="loadFile"></FileSelect>
                 </a-tab-pane>
                 <a-tab-pane key="2" tab="url" force-render>
                   <a-form :model="urlModel" :label-col="{ span: 5 }" style="margin: 20px">

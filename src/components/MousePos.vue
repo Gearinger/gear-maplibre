@@ -41,6 +41,6 @@ watch(
   right: 50px;
   bottom: 20px;
   color: white;
-  text-shadow: 1px 1px 5px black;
+  text-shadow: 1px 1px 3px black;
 }
 </style>
