@@ -1,29 +1,19 @@
 <script setup lang="ts">
 import { Map } from "maplibre-gl";
 import { reactive, onMounted, watch, ref } from "vue";
+import { MapMouseMoveHandlers } from "../common/MapEventUtil";
 
-interface Prop {
-  map: Map;
-}
-const prop = defineProps<Prop>();
 const pos = reactive({
   x: "0",
   y: "0",
 });
 
-const once = ref(true);
-watch(
-  () => prop.map,
-  (newValue, oldValue) => {
-    if (once.value) {      
-      prop.map.on("mousemove", function (e) {
-        pos.x = e.lngLat.lng.toFixed(7);
-        pos.y = e.lngLat.lat.toFixed(7);
-      });
-      once.value = false;
-    }
-  }
-);
+
+MapMouseMoveHandlers.push((e: any) => {
+  pos.x = e.lngLat.lng.toFixed(7);
+  pos.y = e.lngLat.lat.toFixed(7);
+});
+
 </script>
 
 <template>

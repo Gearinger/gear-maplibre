@@ -1,158 +1,63 @@
 <template>
   <div id="map"></div>
-  <TopMenu :map="map" :name="123"/>
-  <LayerManager :map="map"></LayerManager>
-  <MousePos :map="map"></MousePos>
-  <FeatureProp :map="map"></FeatureProp>
+  <!-- <TopMenu :name="123" /> -->
+  <!-- <LayerManager></LayerManager> -->
+  <MousePos></MousePos>
+  <!--<FeatureProp></FeatureProp>-->
+
   <!--<Draw :map="map"></Draw>-->
-  <tile-grid :map="map"></tile-grid>
-  <SingleTileLoad :map="map"></SingleTileLoad>
+  <!-- <tile-grid :map="map"></tile-grid> -->
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import maplibregl from "maplibre-gl"
-import {
-  Map,
-  StyleSpecification,
-  NavigationControl,
-} from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
-import MaplibreGeocoder from '@maplibre/maplibre-gl-geocoder';
-import '@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css';
-import {
-  drawAnno,
-  markCurrentPos,
-  addFlatGeoBuf,
-  addGeoJson,
-  addTileLayer,
-} from "../common/MaplibreUtil";
+import { onBeforeMount, onMounted, ref, watch } from "vue";
+import "../common/MapUtil";
 
 import LayerManager from "./LayerManager.vue";
 import MousePos from "./MousePos.vue";
 import FeatureProp from "./FeatureProp.vue";
-import Draw from "./Draw.vue";
 import TileGrid from "./TileGrid.vue";
 import SingleTileLoad from "./SingleTileLoad.vue";
 import TopMenu from "./TopMenu.vue";
-
-const map = ref<Map>();
-
-var geocoder_api = {
-  forwardGeocode: async (config) => {
-    const features: any = [];
-    try {
-      let request =
-        'https://nominatim.openstreetmap.org/search?q=' +
-        config.query +
-        '&format=geojson&polygon_geojson=1&addressdetails=1';
-      const response = await fetch(request);
-      const geojson = await response.json();
-      for (let feature of geojson.features) {
-        let center = [
-          feature.bbox[0] +
-          (feature.bbox[2] - feature.bbox[0]) / 2,
-          feature.bbox[1] +
-          (feature.bbox[3] - feature.bbox[1]) / 2
-        ];
-        let point = {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: center
-          },
-          place_name: feature.properties.display_name,
-          properties: feature.properties,
-          text: feature.properties.display_name,
-          place_type: ['place'],
-          center: center
-        };
-        features.push(point);
-      }
-    } catch (e) {
-      console.error(`Failed to forwardGeocode with error: ${e}`);
-    }
-
-    return {
-      features: features
-    };
-  }
-};
+import { initMap } from "../common/MapUtil";
+import { Map } from "maplibre-gl";
+import { DrawHandlers, MapMouseMoveHandlers } from "../common/MapEventUtil";
+import { addDrawControl, addGeocoderController, addNavigationControl } from "../common/MapController";
 
 
 // 挂载时初始化地图
 onMounted(() => {
-  map.value = initMap();
-  addControllers(map.value);
+  var map = initMap("map");
+
 
   // 地图加载时
-  map.value.on("load", async () => {
-    // addTileLayer(map.value as Map, "Raster", tdt_raster_url);
-    (map.value as Map).addLayer({
-          id: 'data_poi.1',
-          type: 'circle',
-          source: {
-            type: 'vector',
-            url: 'http://localhost:3000/data_poi.1'
-          },
-          'source-layer': 'data_poi.1'
-        });
+  map.on("load", async () => {
+    addGeocoderController();
+    addNavigationControl();
+    addDrawControl();
+
+    // 添加鼠标位置监听
+
   });
 
   // 点击地图时，获取点击位置的要素
-  map.value.on("click", (e) => {
-    let feas = (map.value as Map).queryRenderedFeatures(e.point, {});
+  map.on("click", (e) => {
+    let feas = map.queryRenderedFeatures(e.point, {});
   });
+
+  map.on("mousemove", (e) => {
+    MapMouseMoveHandlers.forEach((handler) => {
+      handler(e);
+    });
+  });
+
+  map.on("draw.create", e => {
+    DrawHandlers.forEach(handler => {
+      handler(e);
+    });
+  })
 });
 
-/**
- * 初始化地图
- */
-function initMap(): Map {
-  // 创建空白图层样式，用于地图初始化
-  const blankStyle: StyleSpecification = {
-    version: 8,
-    name: "BlankMap",
-    sources: {},
-    glyphs: "./data/glyphs/{fontstack}/{range}.pbf",
-    layers: [
-      {
-        id: "background",
-        type: "background",
-        paint: {
-          // 'background-color': '#08294A' /* 背景颜色 */
-          "background-color": "rgba(255, 255, 255, 0)" /* 背景颜色-透明 */,
-        },
-      },
-    ],
-  };
-  // 初始化地图
-  var map = new Map({
-    container: "map", // container id
-    style: "https://demotiles.maplibre.org/style.json", // style URL
-    // style: "https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL",
-    // style: blankStyle,
-    center: [103, 38], // starting position [lng, lat]
-    zoom: 3, // starting zoom
-  });
-  return map;
-}
-
-/**
- * 添加控件
- * @param map
- */
-function addControllers(map: Map) {
-
-  map.addControl(
-    new MaplibreGeocoder(geocoder_api, {
-      maplibregl: maplibregl
-    })
-  );
-
-  // 添加常用地图控件
-  map.addControl(new NavigationControl({}));
-}
 </script>
 
 <style>

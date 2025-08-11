@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@ant-design/icons-vue": "^6.1.0",
+    "@codemirror/lang-json": "^6.0.2",
     "@mapbox/mapbox-gl-draw": "^1.4.1",
     "@mapbox/mapbox-gl-geocoder": "^5.0.1",
     "@maplibre/maplibre-gl-geocoder": "^1.5.0",
@@ -23,7 +24,11 @@
     "ol": "^7",
     "pbf": "^3.2.1",
     "pnpm": "^7.29.1",
-    "vue": "^3.2.25"
+    "prismjs": "^1.30.0",
+    "turf": "^3.0.14",
+    "vue": "^3.2.25",
+    "vue-codemirror": "^6.1.1",
+    "vue-router": "^4.5.1"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^2.3.3",

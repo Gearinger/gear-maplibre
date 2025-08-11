@@ -3,24 +3,19 @@ import { GeoJSONFeature, GeoJSONSource, Map, MapGeoJSONFeature, Source } from "m
 import { ref, reactive, watch } from "vue";
 import { FeatureCollection, Geometry, feature } from '@turf/turf';
 import { Feature } from "flatgeobuf";
-
-interface Props {
-    map: Map;
-}
-
-const props = defineProps<Props>();
+import { map } from "../common/MapUtil";
 
 
 const once = ref(true);
 watch(
-    () => props.map,
+    () => map,
     (newValue, oldValue) => {
         if (once.value) {
 
-            props.map.on("zoom", async () => {
+            map.on("zoom", async () => {
                 // 计算窗口范围内的瓦片坐标，并显示出每个瓦片的范围
-                const bounds = props.map.getBounds();
-                const zoom = Math.floor(props.map.getZoom() + 1);
+                const bounds = map.getBounds();
+                const zoom = Math.floor(map.getZoom() + 1);
                 // console.log(zoom);
                 const tiles: { x: number; y: number; zoom: number }[] = [];
                 const lngToTile = (lng: number, zoom: number) => Math.floor((lng + 180) / 360 * Math.pow(2, zoom));
@@ -66,12 +61,12 @@ watch(
                     features
                 };
 
-                if (props.map.getSource('tile-grid')) {
-                    (props.map.getSource('tile-grid') as GeoJSONSource).setData(geojson);
+                if (map.getSource('tile-grid')) {
+                    (map.getSource('tile-grid') as GeoJSONSource).setData(geojson);
                 } else {
-                    props.map.addSource('tile-grid', { type: 'geojson', data: geojson });
+                    map.addSource('tile-grid', { type: 'geojson', data: geojson });
 
-                    props.map.addLayer({
+                    map.addLayer({
                         id: 'tile-grid',
                         type: 'line',
                         source: 'tile-grid',
@@ -81,7 +76,7 @@ watch(
                         }
                     });
 
-                    props.map.addLayer({
+                    map.addLayer({
                         id: 'tile-grid-labels',
                         type: 'symbol',
                         source: 'tile-grid',

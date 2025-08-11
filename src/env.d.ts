@@ -9,4 +9,3 @@ declare module '*.vue' {
   export default component
 }
 
-declare var map: Map;

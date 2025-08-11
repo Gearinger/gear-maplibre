@@ -8,15 +8,11 @@ import {
   InboxOutlined,
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
-import { addGeoJson, addTileLayer, addPbfLayer } from "../common/MaplibreUtil";
+import { map } from "../common/MapUtil";
 import { ColumnProps } from "ant-design-vue/lib/table/Column";
 import turf from '@turf/turf'
 import FileSelect from "./FileSelect.vue";
-
-interface Props {
-  map: Map;
-}
-const props = defineProps<Props>();
+import { addGeoJson, addPbfLayer, addTileLayer } from "../common/MapLayerUtil";
 
 type Key = ColumnProps["key"];
 
@@ -71,7 +67,7 @@ const layerFields = [
 async function loadFile(fileName: string, reader: FileReader) {
   let txt = reader.result as string;
   let json = JSON.parse(txt);
-  addGeoJson(props.map as Map, fileName, json)
+  addGeoJson(fileName, json)
     .then((layer) => {
       addLayerToList(layer);
     })
@@ -81,8 +77,8 @@ async function loadFile(fileName: string, reader: FileReader) {
 }
 
 async function deleteLayer(layer: Layer) {
-  props.map.removeLayer(layer.id);
-  props.map.removeSource(layer.source);
+  map.removeLayer(layer.id);
+  map.removeSource(layer.source);
   layerList.value = layerList.value.filter((p) => p.id != layer.id);
   message.success("图层删除成功！");
 }
@@ -92,7 +88,7 @@ async function importfinish() {
   if (activeTab.value == 2) {
     switch (urlModel.type) {
       case "Tile":
-        addTileLayer(props.map, urlModel.layerName, urlModel.url)
+        addTileLayer(urlModel.layerName, urlModel.url)
           .then((layer) => {
             addLayerToList(layer);
             message.success("XYZ-Tile加载成功！");
@@ -102,7 +98,7 @@ async function importfinish() {
           });
         break;
       case "GeoJSON":
-        addGeoJson(props.map, urlModel.layerName, urlModel.url)
+        addGeoJson(urlModel.layerName, urlModel.url)
           .then((layer) => {
             addLayerToList(layer);
             message.success("GeoJSON加载成功！");
@@ -112,7 +108,7 @@ async function importfinish() {
           });
         break;
       case "Vector Tile":
-        addPbfLayer(props.map, urlModel.layerName, urlModel.url)
+        addPbfLayer(urlModel.layerName, urlModel.url)
           .then((layer) => {
             addLayerToList(layer);
             message.success("Vector Tile加载成功！");
@@ -132,7 +128,7 @@ async function importfinish() {
             const layer = layerMap[layerName];
             switch (layer["content_type"]) {
               case "application/x-protobuf":
-                addPbfLayer(props.map, layerName, martinCatalogUrl.replace("catalog", layerName))
+                addPbfLayer(layerName, martinCatalogUrl.replace("catalog", layerName))
                   .then((layer) => {
                     addLayerToList(layer);
                     message.success("Vector Tile加载成功！");
@@ -152,7 +148,7 @@ async function importfinish() {
   if (activeTab.value == 3) {
     switch (textModel.type) {
       case "GeoJSON":
-        addGeoJson(props.map, Date.now().toString(), JSON.parse(textModel.content))
+        addGeoJson(Date.now().toString(), JSON.parse(textModel.content))
           .then((layer) => {
             addLayerToList(layer);
             message.success("GeoJSON加载成功！");
@@ -181,9 +177,9 @@ function onSelectLayerChange(selectedRowKeys, selectedRows) {
 }
 
 async function onSelectLayer(record, selected, selectedRows, nativeEvent) {
-  let layer = props.map.getLayer((record as Layer).id);
+  let layer = map.getLayer((record as Layer).id);
   layer.visibility = selected ? "visible" : "none";
-  props.map.resize();
+  map.resize();
 }
 
 function githubHandle() {

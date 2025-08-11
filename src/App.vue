@@ -1,12 +1,19 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
+import { router } from './router';
+
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
-import Map from "./components/Map.vue";
+
+onMounted(() => {
+  // This will redirect to the GeojsonMap view when the app is mounted
+  // router.push('/home');
+});
 
 </script>
 
 <template>
-  <Map></Map>
+  <RouterView></RouterView>
 </template>
 
 <style lang="less">

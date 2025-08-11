@@ -3,12 +3,8 @@ import { GeoJSONFeature, GeoJSONSource, Map, MapGeoJSONFeature, Source } from "m
 import { ref, reactive, watch } from "vue";
 import { FeatureCollection, Geometry, feature } from '@turf/turf';
 import { Feature } from "flatgeobuf";
+import { map } from "../common/MapUtil";
 
-interface Props {
-    map: Map;
-}
-
-const props = defineProps<Props>();
 
 interface DisplayFeature {
     type: string,
@@ -22,25 +18,23 @@ var selectFeatureList = ref<DisplayFeature[]>([]);
 const activeKey = ref(0);
 const descriptionVisiable = ref(false)
 
-async function addFeatureSelectEvent() {
-    props.map.on("mouseup", function (e) {
-        descriptionVisiable.value = false;
-        let features = props.map.queryRenderedFeatures(e.point);
-        selectFeatureList.value = []
-        features.forEach(feat => {
-            selectFeatureList.value.push({
-                type: feat['type'],
-                properties: feat['properties'],
-                id: feat['id']?.toString() ?? '0',
-                source: feat['source'],
-                geojson: JSON.stringify(feature(feat.geometry)),
-            });
-        })
-        descriptionVisiable.value = true;
+map.on("mouseup", function (e) {
+    descriptionVisiable.value = false;
+    let features = map.queryRenderedFeatures(e.point);
+    selectFeatureList.value = []
+    features.forEach(feat => {
+        selectFeatureList.value.push({
+            type: feat['type'],
+            properties: feat['properties'],
+            id: feat['id']?.toString() ?? '0',
+            source: feat['source'],
+            geojson: JSON.stringify(feature(feat.geometry)),
+        });
+    })
+    descriptionVisiable.value = true;
 
-        console.log(features);
-    });
-}
+    console.log(features);
+});
 
 async function propChangeHandle(e: InputEvent, prop: string, key) {
     prop = prop.toString()
@@ -53,7 +47,7 @@ async function propChangeHandle(e: InputEvent, prop: string, key) {
     if (e.inputType == "deleteContentBackward") {
         currentFeat.properties[key] = prop.substring(0, prop.length - 1);
     }
-    const source = props.map.getSource(currentFeat.source) as GeoJSONSource;
+    const source = map.getSource(currentFeat.source) as GeoJSONSource;
     let data = source._data as FeatureCollection;
     const features: any[] = []
     for (let i = 0; i < data.features.length; i++) {
@@ -72,16 +66,6 @@ async function propChangeHandle(e: InputEvent, prop: string, key) {
     });
 }
 
-const once = ref(true);
-watch(
-    () => props.map,
-    (oldValue, newValue) => {
-        if (once.value) {
-            addFeatureSelectEvent();
-            once.value = false;
-        }
-    }
-);
 </script>
 
 <template>
