@@ -57,6 +57,39 @@ async function refresh() {
 
             }
         });
+        map.addLayer({
+            id: 'geojson-outline',
+            type: 'line',
+            source: 'geojson-source',
+            paint: {
+                'line-color': '#ff0000',
+                'line-width': 2
+            }
+        });
+        map.addLayer({
+            id: 'geojson-label',
+            type: 'symbol',
+            source: 'geojson-source',
+            layout: {
+                'text-field': ['get', 'name'], // 假设 GeoJSON 中有一个 'name' 属性
+                'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+                'text-size': 12,
+                'text-anchor': 'center',
+                'text-offset': [0, 0.5]
+            },
+            paint: {
+                'text-color': '#ff0000'
+            }
+        });
+        map.addLayer({
+            id: 'geojson-point',
+            type: 'circle',
+            source: 'geojson-source',
+            paint: {
+                'circle-color': '#ff0000',
+                'circle-radius': 5
+            }
+        });
         // 鼠标悬浮在要素上时，要素高亮
         let hoveredFeatureId: any = null;
         map.on('mouseover', 'geojson-layer', (e) => {
