@@ -9,7 +9,7 @@ const routes = [
     { path: '/', component: Home },
     { path: '/home', component: Home },
     { path: '/geojson', component: GeojsonMap },
-    { path: '/supabase', component: Supabase },
+    // { path: '/supabase', component: Supabase },
 ]
 
 export const router = createRouter({

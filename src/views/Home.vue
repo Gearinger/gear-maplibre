@@ -1,11 +1,11 @@
 <template>
-    <Map></Map>
+    <Map class="map"></Map>
     <TopMenu :name="123" />
     <LayerManager></LayerManager>
     <MousePos></MousePos>
-    <FeatureProp></FeatureProp>
+    <!-- <FeatureProp></FeatureProp> -->
     <!--<Draw :map="map"></Draw>-->
-    <TileGrid></TileGrid>
+    <!-- <TileGrid></TileGrid> -->
 </template>
 
 <script setup lang="ts">
@@ -18,3 +18,12 @@ import FeatureProp from "../components/FeatureProp.vue";
 import TileGrid from "../components/TileGrid.vue";
 
 </script>
+
+<style scoped>
+.map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+}
+</style>

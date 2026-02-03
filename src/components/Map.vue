@@ -34,7 +34,7 @@ onMounted(() => {
   map.on("load", async () => {
     addGeocoderController();
     addNavigationControl();
-    addDrawControl();
+    // addDrawControl();
 
     // 添加鼠标位置监听
 

@@ -11,7 +11,7 @@ watch(
     () => map,
     (newValue, oldValue) => {
         if (once.value) {
-
+            console.log("TileGrid mounted");
             map.on("zoom", async () => {
                 // 计算窗口范围内的瓦片坐标，并显示出每个瓦片的范围
                 const bounds = map.getBounds();

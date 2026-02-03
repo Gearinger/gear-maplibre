@@ -3,6 +3,18 @@ import { Map, MapMouseEvent } from "maplibre-gl";
 import { map } from "../common/MapUtil";
 import { onMounted, onActivated, ref, h } from "vue";
 import { message } from "ant-design-vue";
+import { disableTileGrid, enableTileGrid } from "../common/MapTileGridUtil";
+
+var tileGridable = ref(false);
+
+function switchTileGrid() {
+  if (tileGridable.value) {
+    disableTileGrid();
+  } else {
+    enableTileGrid();
+  }
+  tileGridable.value = !tileGridable.value;
+}
 
 </script>
 
@@ -10,6 +22,7 @@ import { message } from "ant-design-vue";
   <div class="map-menu">
     <button>导入</button>
     <button>导出</button>
+    <button @click="switchTileGrid()">TileGrid</button>
   </div>
 </template>
 
