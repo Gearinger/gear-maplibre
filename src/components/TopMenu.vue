@@ -6,6 +6,8 @@ import {
   TableOutlined,
   CodeOutlined,
   UploadOutlined,
+  UndoOutlined,
+  RedoOutlined,
 } from "@ant-design/icons-vue";
 import { disableTileGrid, enableTileGrid } from "../common/MapTileGridUtil";
 import { useWorkspace } from "../stores/workspace";
@@ -14,6 +16,8 @@ defineProps<{
   layersOpen: boolean;
   editorOpen: boolean;
   canExportGeoJson: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -23,6 +27,8 @@ const emit = defineEmits<{
   (event: "export-geojson"): void;
   (event: "export-project"): void;
   (event: "import-project"): void;
+  (event: "undo"): void;
+  (event: "redo"): void;
 }>();
 
 const { projectName, saving } = useWorkspace();
@@ -53,6 +59,12 @@ function switchTileGrid() {
 
     <div class="header-actions">
       <span class="save-status">{{ saving ? "保存中..." : "已自动保存到本机" }}</span>
+      <a-button title="撤销" :disabled="!canUndo" @click="emit('undo')">
+        <template #icon><UndoOutlined /></template>
+      </a-button>
+      <a-button title="重做" :disabled="!canRedo" @click="emit('redo')">
+        <template #icon><RedoOutlined /></template>
+      </a-button>
       <a-button :type="layersOpen ? 'primary' : 'default'" @click="emit('toggle-layers')">
         图层
       </a-button>

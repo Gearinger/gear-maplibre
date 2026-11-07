@@ -16,6 +16,7 @@ import { updateGeoJsonFeatureProperties } from "../common/GeoJsonUtil";
 
 const emit = defineEmits<{
   (event: "focus"): void;
+  (event: "edit-geometry"): void;
 }>();
 
 const { selectedFeature, layers } = useWorkspace();
@@ -126,6 +127,9 @@ function saveProperties() {
           </div>
         </div>
         <div class="inspector-actions">
+          <a-button v-if="canEdit" size="small" title="编辑几何" @click="emit('edit-geometry')">
+            <template #icon><EditOutlined /></template>
+          </a-button>
           <a-button v-if="canEdit && !editing" size="small" title="编辑属性" @click="startEditing">
             <template #icon><EditOutlined /></template>
           </a-button>

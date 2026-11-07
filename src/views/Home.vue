@@ -1,10 +1,11 @@
 <template>
   <div class="workspace-shell">
     <TopMenu :layers-open="leftPanelOpen" :editor-open="rightPanelOpen"
-      :can-export-geo-json="canExportGeoJson" @toggle-layers="leftPanelOpen = !leftPanelOpen"
+      :can-export-geo-json="canExportGeoJson" :can-undo="canUndo" :can-redo="canRedo"
+      @toggle-layers="leftPanelOpen = !leftPanelOpen"
       @toggle-editor="rightPanelOpen = !rightPanelOpen" @load-sample="loadSample"
       @export-geojson="exportActiveGeoJson" @export-project="exportProject"
-      @import-project="chooseProjectFile" />
+      @import-project="chooseProjectFile" @undo="undo" @redo="redo" />
     <input ref="projectInput" type="file" accept=".json,application/json" hidden
       @change="importProjectFile">
 
@@ -25,6 +26,7 @@
             @click="startDrawing('draw_line_string')">线</button>
           <button :class="{ active: drawMode === 'draw_polygon' }"
             @click="startDrawing('draw_polygon')">面</button>
+          <button v-if="geometryEditing" @click="cancelGeometryEditing">取消几何编辑</button>
           <button v-if="drawMode" @click="stopDrawing">结束</button>
         </div>
         <div v-if="layers.length === 0" class="map-empty-state">
@@ -54,7 +56,8 @@
             <LayerStyleEditor />
           </a-tab-pane>
           <a-tab-pane key="feature" tab="要素">
-            <FeatureInspector @focus="focusSelectedFeature" />
+            <FeatureInspector @focus="focusSelectedFeature"
+              @edit-geometry="startGeometryEditing" />
           </a-tab-pane>
         </a-tabs>
       </aside>
@@ -79,7 +82,10 @@ import { map } from "../common/MapUtil";
 import {
   appendGeoJsonFeatures,
   findGeoJsonFeatureIndex,
+  getGeoJsonFeature,
+  replaceGeoJsonFeature,
 } from "../common/GeoJsonUtil";
+import { createSnapshotHistory } from "../common/SnapshotHistory";
 import {
   addGeoJson,
   addPbfLayer,
@@ -117,23 +123,37 @@ const {
 const editorContent = ref("");
 const projectInput = ref<HTMLInputElement>();
 const drawMode = ref<DrawMode | null>(null);
+const geometryEditing = ref(false);
 let draw: MapboxDraw | undefined;
+let pendingGeometryEdit:
+  | { layerKey: string; featureIndex: number }
+  | undefined;
 let editorSync = false;
 let editorTimer: ReturnType<typeof setTimeout> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let persistenceReady = false;
 let mapEventsReady = false;
+let applyingHistory = false;
+
+const history = createSnapshotHistory<WorkspaceSnapshot>(
+  (snapshot) => JSON.stringify({ ...snapshot, savedAt: "" }),
+  40
+);
 
 type DrawMode = "draw_point" | "draw_line_string" | "draw_polygon";
 type DrawCreatedEvent = { features: GeoJSON.Feature[] };
 type DrawEventMap = {
   on(type: "draw.create", listener: (event: DrawCreatedEvent) => void): unknown;
   off(type: "draw.create", listener: (event: DrawCreatedEvent) => void): unknown;
+  on(type: "draw.update", listener: (event: DrawCreatedEvent) => void): unknown;
+  off(type: "draw.update", listener: (event: DrawCreatedEvent) => void): unknown;
 };
 
 const canExportGeoJson = computed(() =>
   activeLayer.value?.type === "GeoJSON" && Boolean(activeLayer.value.data)
 );
+const canUndo = computed(() => history.canUndo.value && !applyingHistory);
+const canRedo = computed(() => history.canRedo.value && !applyingHistory);
 
 watch(activeLayer, (layer) => {
   editorSync = true;
@@ -153,12 +173,14 @@ watch(activeLayerKey, () => {
 watch(
   [layers, projectName, activeLayerKey],
   () => {
-    if (!persistenceReady) return;
+    if (!persistenceReady || applyingHistory) return;
     clearTimeout(saveTimer);
     saving.value = true;
     saveTimer = setTimeout(async () => {
       try {
-        await saveWorkspaceSnapshot(workspace.snapshot());
+        const snapshot = cloneSnapshot(workspace.snapshot());
+        history.push(snapshot);
+        await saveWorkspaceSnapshot(snapshot);
       } catch (error) {
         console.error("Workspace autosave failed:", error);
         message.error("自动保存失败，请及时导出项目");
@@ -180,6 +202,43 @@ function downloadJson(fileName: string, value: unknown) {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function cloneSnapshot(snapshot: WorkspaceSnapshot) {
+  return JSON.parse(JSON.stringify(snapshot)) as WorkspaceSnapshot;
+}
+
+async function applyHistorySnapshot(snapshot: WorkspaceSnapshot) {
+  applyingHistory = true;
+  stopDrawing();
+  try {
+    for (const layer of layers.value) {
+      try {
+        removeManagedLayer(layer);
+      } catch (error) {
+        console.warn(`Unable to remove layer ${layer.name}:`, error);
+      }
+    }
+    workspace.clearLayers();
+    await restoreWorkspace(cloneSnapshot(snapshot));
+    await saveWorkspaceSnapshot(cloneSnapshot(snapshot));
+  } finally {
+    applyingHistory = false;
+  }
+}
+
+async function undo() {
+  clearTimeout(saveTimer);
+  history.push(cloneSnapshot(workspace.snapshot()));
+  const snapshot = history.undo();
+  if (!snapshot) return;
+  await applyHistorySnapshot(snapshot);
+}
+
+async function redo() {
+  const snapshot = history.redo();
+  if (!snapshot) return;
+  await applyHistorySnapshot(snapshot);
 }
 
 function safeFileName() {
@@ -222,6 +281,7 @@ async function importProjectFile(event: Event) {
     for (const layer of layers.value) removeManagedLayer(layer);
     workspace.clearLayers();
     await restoreWorkspace(snapshot);
+    history.reset(cloneSnapshot(workspace.snapshot()));
     message.success("项目导入成功");
   } catch (error) {
     message.error(`项目导入失败：${error instanceof Error ? error.message : String(error)}`);
@@ -273,6 +333,8 @@ function stopDrawing() {
   draw.deleteAll();
   draw.changeMode("simple_select");
   drawMode.value = null;
+  geometryEditing.value = false;
+  pendingGeometryEdit = undefined;
 }
 
 function onDrawCreated(event: DrawCreatedEvent) {
@@ -308,6 +370,77 @@ function onDrawCreated(event: DrawCreatedEvent) {
   message.success("要素已添加，右侧可以继续编辑属性");
 }
 
+function cancelGeometryEditing() {
+  stopDrawing();
+}
+
+function startGeometryEditing() {
+  const selected = selectedFeature.value;
+  const layer = layers.value.find((item) => item.key === selected?.layerKey);
+  if (!draw || !selected || !layer?.data || selected.featureIndex === undefined) {
+    message.warning("当前要素不支持几何编辑");
+    return;
+  }
+  if (!["Point", "LineString", "Polygon", "MultiPolygon"].includes(selected.geometryType)) {
+    message.warning("当前几何类型暂不支持直接编辑");
+    return;
+  }
+
+  draw.deleteAll();
+  const drawId = `edit-${Date.now()}`;
+  draw.add({
+    ...selected.feature,
+    id: drawId,
+  });
+  draw.changeMode("direct_select", { featureId: drawId });
+  pendingGeometryEdit = {
+    layerKey: layer.key,
+    featureIndex: selected.featureIndex,
+  };
+  geometryEditing.value = true;
+  message.info("拖动节点修改几何，松开后自动保存");
+}
+
+function onDrawUpdated(event: DrawCreatedEvent) {
+  const pending = pendingGeometryEdit;
+  const feature = event.features[0];
+  if (!pending || !feature) return;
+
+  const layer = layers.value.find((item) => item.key === pending.layerKey);
+  if (!layer?.data) {
+    stopDrawing();
+    return;
+  }
+
+  try {
+    const original = getGeoJsonFeature(layer.data, pending.featureIndex);
+    if (!original) throw new Error("找不到原始要素");
+    const updated = {
+      ...original,
+      geometry: feature.geometry,
+      properties: feature.properties ?? original.properties,
+    };
+    const result = replaceGeoJsonFeature(
+      layer.data,
+      pending.featureIndex,
+      updated
+    );
+    layer.data = result.data;
+    updateManagedGeoJson(layer, result.data);
+    selectedFeature.value = {
+      ...selectedFeature.value!,
+      feature: result.feature,
+      geometryType: result.feature.geometry.type,
+      properties: result.feature.properties ?? {},
+    };
+    message.success("几何已更新");
+  } catch (error) {
+    message.error(`几何更新失败：${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    stopDrawing();
+  }
+}
+
 function setupDrawing() {
   if (draw) return;
   draw = new MapboxDraw({
@@ -316,6 +449,7 @@ function setupDrawing() {
   });
   map.addControl(draw as unknown as IControl, "top-right");
   (map as unknown as DrawEventMap).on("draw.create", onDrawCreated);
+  (map as unknown as DrawEventMap).on("draw.update", onDrawUpdated);
 }
 
 function findLayerForFeature(layerId: string) {
@@ -432,6 +566,7 @@ async function initializeWorkspace() {
     await restoreWorkspace(snapshot);
   }
 
+  history.reset(cloneSnapshot(workspace.snapshot()));
   persistenceReady = true;
 }
 
@@ -456,6 +591,7 @@ onBeforeUnmount(() => {
   }
   if (draw) {
     (map as unknown as DrawEventMap).off("draw.create", onDrawCreated);
+    (map as unknown as DrawEventMap).off("draw.update", onDrawUpdated);
     map.removeControl(draw as unknown as IControl);
     draw = undefined;
   }
