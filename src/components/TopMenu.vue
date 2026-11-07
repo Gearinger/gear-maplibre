@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { Map, MapMouseEvent } from "maplibre-gl";
-import { map } from "../common/MapUtil";
-import { onMounted, onActivated, ref, h } from "vue";
-import { message } from "ant-design-vue";
+import { ref } from "vue";
 import { disableTileGrid, enableTileGrid } from "../common/MapTileGridUtil";
 
 var tileGridable = ref(false);
@@ -20,8 +17,8 @@ function switchTileGrid() {
 
 <template>
   <div class="map-menu">
-    <button>导入</button>
-    <button>导出</button>
+    <button disabled title="请使用左侧图层面板导入">导入</button>
+    <button disabled title="导出功能尚未实现">导出</button>
     <button @click="switchTileGrid()">TileGrid</button>
   </div>
 </template>

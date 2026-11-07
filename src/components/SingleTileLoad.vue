@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { GeoJSONFeature, GeoJSONSource, ImageSource, Map, MapGeoJSONFeature, Source } from "maplibre-gl";
-import { ref, reactive, watch } from "vue";
-import { Feature, FeatureCollection, Geometry, Properties, feature } from '@turf/turf';
+import type { Map } from "maplibre-gl";
+import { ref } from "vue";
 import { VectorTile } from '@mapbox/vector-tile';
 import Pbf from "pbf";
 
@@ -16,8 +15,6 @@ const showModal = ref(false);
 
 const addTileLayer = () => {
     if (tileUrl.value) {
-        console.log("添加单张瓦片");
-
         const calculateTileBounds = (x: number, y: number, z: number): [[number, number], [number, number], [number, number], [number, number]] => {
             const tile2lon = (x: number, z: number) => (x / Math.pow(2, z) * 360 - 180);
             const tile2lat = (y: number, z: number) => {
@@ -46,30 +43,48 @@ const addTileLayer = () => {
         const x = parseInt(urlParts[2]);
         const y = parseInt(urlParts[3]);
         const bounds = calculateTileBounds(x, y, z);
-        console.log(bounds);
-
-        if (props.map.getSource('single-tile')) {
-            var layerIds = props.map.getSource('single-tile')?.vectorLayerIds ?? [];
-            for (const layerId of layerIds) {
-                props.map.removeLayer('single-tile-layer');
+        const layerIds = [
+            'single-tile-layer',
+            'single-tile-points-layer',
+            'single-tile-lines-layer',
+            'single-tile-polygons-layer',
+        ];
+        const sourceIds = [
+            'single-tile',
+            'single-tile-points',
+            'single-tile-lines',
+            'single-tile-polygons',
+        ];
+        for (const layerId of layerIds) {
+            if (props.map.getLayer(layerId)) {
+                props.map.removeLayer(layerId);
             }
-            props.map.removeSource('single-tile');
+        }
+        for (const sourceId of sourceIds) {
+            if (props.map.getSource(sourceId)) {
+                props.map.removeSource(sourceId);
+            }
         }
 
         if (tileUrl.value.endsWith("pbf")) {
             fetch(tileUrl.value)
-                .then(response => response.arrayBuffer())
+                .then(response => {
+                    if (!response.ok) throw new Error(`瓦片请求失败：${response.status}`);
+                    return response.arrayBuffer();
+                })
                 .then(data => {
 
                     const pbf = new Pbf(data);
                     const vectorTile = new VectorTile(pbf);
-                    const layer = vectorTile.layers[Object.keys(vectorTile.layers)[0]];
+                    const layerName = Object.keys(vectorTile.layers)[0];
+                    if (!layerName) throw new Error('PBF 瓦片中没有可用图层');
+                    const layer = vectorTile.layers[layerName];
 
-                    const features: Feature[] = [];
+                    const features: GeoJSON.Feature[] = [];
 
                     for (let i = 0; i < layer.length; i++) {
                         const feature = layer.feature(i);
-                        const geojsonFeature = feature.toGeoJSON(x, y, z) as GeoJSONFeature;
+                        const geojsonFeature = feature.toGeoJSON(x, y, z) as GeoJSON.Feature;
 
                         features.push(geojsonFeature);
                     }

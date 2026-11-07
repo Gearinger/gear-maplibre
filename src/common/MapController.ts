@@ -13,13 +13,21 @@ export function addGeocoderController(): Map {
         forwardGeocode: async (config): Promise<MaplibreGeocoderFeatureResults> => {
             const features: any = [];
             try {
-                let request =
-                    'https://nominatim.openstreetmap.org/search?q=' +
-                    config.query +
-                    '&format=geojson&polygon_geojson=1&addressdetails=1';
+                if (typeof config.query !== 'string') {
+                    throw new Error('Forward geocoding requires a text query');
+                }
+                const request = new URL('https://nominatim.openstreetmap.org/search');
+                request.searchParams.set('q', config.query);
+                request.searchParams.set('format', 'geojson');
+                request.searchParams.set('polygon_geojson', '1');
+                request.searchParams.set('addressdetails', '1');
                 const response = await fetch(request);
-                const geojson = await response.json();
+                if (!response.ok) {
+                    throw new Error(`Geocoder request failed with status ${response.status}`);
+                }
+                const geojson = await response.json() as GeoJSON.FeatureCollection<GeoJSON.Geometry, { display_name: string }>;
                 for (let feature of geojson.features) {
+                    if (!feature.bbox || feature.bbox.length < 4) continue;
                     let center = [
                         feature.bbox[0] +
                         (feature.bbox[2] - feature.bbox[0]) / 2,
@@ -70,6 +78,6 @@ export function addNavigationControl(): Map {
 };
 
 export function addDrawControl(): Map {
-    map.addControl(new MapboxDraw() as any);
+    map.addControl(new MapboxDraw() as unknown as IControl);
     return map;
 }

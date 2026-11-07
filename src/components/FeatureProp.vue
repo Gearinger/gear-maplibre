@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { GeoJSONFeature, GeoJSONSource, Map, MapGeoJSONFeature, Source } from "maplibre-gl";
 import { ref, reactive, watch } from "vue";
-import { FeatureCollection, Geometry, feature } from '@turf/turf';
-import { Feature } from "flatgeobuf";
+import { feature } from '@turf/turf';
 import { map } from "../common/MapUtil";
 
 
 interface DisplayFeature {
     type: string,
-    properties: {},
+    properties: Record<string, unknown>,
     id: string,
     source: string,
     geojson: string
@@ -33,13 +32,12 @@ map.on("mouseup", function (e) {
     })
     descriptionVisiable.value = true;
 
-    console.log(features);
 });
 
-async function propChangeHandle(e: InputEvent, prop: string, key) {
+async function propChangeHandle(e: InputEvent, prop: string, key: string) {
     prop = prop.toString()
     let currentFeat = selectFeatureList.value[activeKey.value];
-    console.log(e);
+    if (!currentFeat) return;
 
     if (e.data) {
         currentFeat.properties[key] = prop + e.data;
@@ -48,8 +46,8 @@ async function propChangeHandle(e: InputEvent, prop: string, key) {
         currentFeat.properties[key] = prop.substring(0, prop.length - 1);
     }
     const source = map.getSource(currentFeat.source) as GeoJSONSource;
-    let data = source._data as FeatureCollection;
-    const features: any[] = []
+    let data = source.serialize().data as GeoJSON.FeatureCollection;
+    const features: GeoJSON.Feature[] = []
     for (let i = 0; i < data.features.length; i++) {
         let feature = data.features[i];
         if (i.toString() == currentFeat.id) {
@@ -125,7 +123,8 @@ async function propChangeHandle(e: InputEvent, prop: string, key) {
 
 
 
-                        <a-input :value="item.properties[key]" @change="e => propChangeHandle(e, prop, key)"></a-input>
+                        <a-input :value="item.properties[key]"
+                            @change="propChangeHandle($event, String(prop ?? ''), key)"></a-input>
 
 
 

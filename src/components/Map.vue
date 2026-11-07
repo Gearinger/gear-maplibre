@@ -1,63 +1,52 @@
 <template>
   <div id="map"></div>
-  <!-- <TopMenu :name="123" /> -->
-  <!-- <LayerManager></LayerManager> -->
   <MousePos></MousePos>
-  <!--<FeatureProp></FeatureProp>-->
-
-  <!--<Draw :map="map"></Draw>-->
-  <!-- <tile-grid :map="map"></tile-grid> -->
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, onMounted, ref, watch } from "vue";
-import "../common/MapUtil";
-
-import LayerManager from "./LayerManager.vue";
+import { onBeforeUnmount, onMounted } from "vue";
 import MousePos from "./MousePos.vue";
-import FeatureProp from "./FeatureProp.vue";
-import TileGrid from "./TileGrid.vue";
-import SingleTileLoad from "./SingleTileLoad.vue";
-import TopMenu from "./TopMenu.vue";
-import { initMap } from "../common/MapUtil";
-import { Map } from "maplibre-gl";
-import { DrawHandlers, MapMouseMoveHandlers } from "../common/MapEventUtil";
+import { destroyMap, initMap } from "../common/MapUtil";
+import type { Map, MapMouseEvent } from "maplibre-gl";
+import { DrawHandlers, MapMouseMoveHandlers, type DrawEvent } from "../common/MapEventUtil";
 import { addDrawControl, addGeocoderController, addNavigationControl } from "../common/MapController";
 
+let map: Map | undefined;
+
+const onMouseMove = (event: MapMouseEvent) => {
+  MapMouseMoveHandlers.forEach((handler) => handler(event));
+};
+
+const onDrawCreate = (event: DrawEvent) => {
+  DrawHandlers.forEach((handler) => handler(event));
+};
 
 // 挂载时初始化地图
 onMounted(() => {
-  var map = initMap("map");
+  map = initMap("map");
 
-
-  // 地图加载时
-  map.on("load", async () => {
+  const addControls = () => {
     addGeocoderController();
     addNavigationControl();
-    // addDrawControl();
+  };
 
-    // 添加鼠标位置监听
+  if (map.loaded()) {
+    addControls();
+  } else {
+    map.once("load", addControls);
+  }
 
-  });
-
-  // 点击地图时，获取点击位置的要素
-  map.on("click", (e) => {
-    let feas = map.queryRenderedFeatures(e.point, {});
-  });
-
-  map.on("mousemove", (e) => {
-    MapMouseMoveHandlers.forEach((handler) => {
-      handler(e);
-    });
-  });
-
-  map.on("draw.create", e => {
-    DrawHandlers.forEach(handler => {
-      handler(e);
-    });
-  })
+  map.on("mousemove", onMouseMove);
+  map.on("draw.create", onDrawCreate as (event: unknown) => void);
 });
 
+onBeforeUnmount(() => {
+  if (!map) return;
+  map.off("mousemove", onMouseMove);
+  map.off("draw.create", onDrawCreate as (event: unknown) => void);
+  destroyMap();
+  map = undefined;
+});
 </script>
 
 <style>

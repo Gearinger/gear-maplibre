@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { ref, reactive } from "vue";
-import { Map } from "maplibre-gl";
+import { computed, reactive, ref } from "vue";
 import {
   GithubOutlined,
   QuestionCircleOutlined,
   DeleteOutlined,
-  InboxOutlined,
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 import { map } from "../common/MapUtil";
 import { ColumnProps } from "ant-design-vue/lib/table/Column";
-import turf from '@turf/turf'
 import FileSelect from "./FileSelect.vue";
-import { addGeoJson, addPbfLayer, addTileLayer } from "../common/MapLayerUtil";
+import {
+  addGeoJson,
+  addPbfLayer,
+  addTileLayer,
+  type ManagedLayer,
+} from "../common/MapLayerUtil";
 
 type Key = ColumnProps["key"];
 
@@ -26,12 +28,13 @@ interface Layer {
 /**
  * 图层搜索内容
  */
-let searchLayerContent = ref();
-let layerList = ref<Layer[]>([]);
-let selectedLayers = ref<Key[]>([]);
-let importVisible = ref(false);
-let fileAreaActive = ref(false);
-let activeTab = ref();
+const searchLayerContent = ref("");
+const layerList = ref<Layer[]>([]);
+const selectedLayers = ref<Key[]>([]);
+const importVisible = ref(false);
+const activeTab = ref("1");
+let nextLayerKey = 0;
+
 const textModel = reactive({
   type: "GeoJSON",
   content: "",
@@ -41,6 +44,16 @@ const urlModel = reactive({
   type: "Tile",
   layerName: "layer",
   url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+});
+
+const filteredLayerList = computed(() => {
+  const query = searchLayerContent.value.trim().toLowerCase();
+  if (!query) return layerList.value;
+  return layerList.value.filter((layer) =>
+    [layer.id, layer.type, layer.source].some((value) =>
+      value.toLowerCase().includes(query)
+    )
+  );
 });
 
 const layerFields = [
@@ -64,105 +77,117 @@ const layerFields = [
   },
 ];
 
-async function loadFile(fileName: string, reader: FileReader) {
-  let txt = reader.result as string;
-  let json = JSON.parse(txt);
-  addGeoJson(fileName, json)
-    .then((layer) => {
-      addLayerToList(layer);
-    })
-    .catch((e: Error) => {
-      message.error(e.message);
-    });
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getUniqueLayerName(baseName: string) {
+  const normalized = baseName.trim() || "layer";
+  let candidate = normalized;
+  let suffix = 1;
+  while (
+    map.getSource(candidate) ||
+    (map.getStyle().layers ?? []).some((layer) => layer.id === candidate)
+  ) {
+    candidate = `${normalized}-${suffix++}`;
+  }
+  return candidate;
+}
+
+async function loadFile(fileName: string, content: string) {
+  try {
+    const json = JSON.parse(content) as GeoJSON.GeoJSON;
+    const sourceName = getUniqueLayerName(fileName.replace(/\.[^.]+$/, ""));
+    addLayerToList(await addGeoJson(sourceName, json));
+    importVisible.value = false;
+    message.success(`${fileName} 加载成功`);
+  } catch (error) {
+    message.error(`文件解析或加载失败：${getErrorMessage(error)}`);
+  }
+}
+
+function getLayerStyleIds(layer: Layer) {
+  return (map.getStyle().layers ?? [])
+    .filter((styleLayer) => "source" in styleLayer && styleLayer.source === layer.source)
+    .map((styleLayer) => styleLayer.id);
 }
 
 async function deleteLayer(layer: Layer) {
-  map.removeLayer(layer.id);
-  map.removeSource(layer.source);
-  layerList.value = layerList.value.filter((p) => p.id != layer.id);
-  message.success("图层删除成功！");
+  try {
+    for (const layerId of getLayerStyleIds(layer)) {
+      if (map.getLayer(layerId)) map.removeLayer(layerId);
+    }
+    if (map.getSource(layer.source)) map.removeSource(layer.source);
+
+    layerList.value = layerList.value.filter((item) => item.key !== layer.key);
+    selectedLayers.value = selectedLayers.value.filter((key) => key !== layer.key);
+    message.success("图层删除成功！");
+  } catch (error) {
+    message.error(`图层删除失败：${getErrorMessage(error)}`);
+  }
+}
+
+async function importMartinCatalog(catalogUrl: string) {
+  const response = await fetch(catalogUrl);
+  if (!response.ok) throw new Error(`Martin Catalog 请求失败：${response.status}`);
+
+  const catalog = await response.json() as {
+    tiles?: Record<string, { content_type?: string }>;
+  };
+  const layerMap = catalog.tiles ?? {};
+  let loaded = 0;
+
+  for (const layerName of Object.keys(layerMap)) {
+    if (layerMap[layerName].content_type !== "application/x-protobuf") continue;
+    const uniqueName = getUniqueLayerName(layerName);
+    const tileUrl = catalogUrl.replace(/catalog\/?$/, uniqueName);
+    addLayerToList(await addPbfLayer(uniqueName, tileUrl));
+    loaded++;
+  }
+
+  if (loaded === 0) throw new Error("Martin Catalog 中没有可用的 PBF 图层");
 }
 
 async function importfinish() {
-  importVisible.value = false;
-  if (activeTab.value == 2) {
-    switch (urlModel.type) {
-      case "Tile":
-        addTileLayer(urlModel.layerName, urlModel.url)
-          .then((layer) => {
-            addLayerToList(layer);
-            message.success("XYZ-Tile加载成功！");
-          })
-          .catch((e: Error) => {
-            message.error(e.message);
-          });
-        break;
-      case "GeoJSON":
-        addGeoJson(urlModel.layerName, urlModel.url)
-          .then((layer) => {
-            addLayerToList(layer);
-            message.success("GeoJSON加载成功！");
-          })
-          .catch((e: Error) => {
-            message.error(e.message);
-          });
-        break;
-      case "Vector Tile":
-        addPbfLayer(urlModel.layerName, urlModel.url)
-          .then((layer) => {
-            addLayerToList(layer);
-            message.success("Vector Tile加载成功！");
-          })
-          .catch((e: Error) => {
-            message.error(e.message);
-          });
-        break;
-      case "Martin Catalog":
-        let mainName = urlModel.layerName;
-        let martinCatalogUrl = urlModel.url;
-        let catalog = await (await fetch(martinCatalogUrl)).json()
-        console.log("Martin Catalog content:", catalog);
-        let layerMap = catalog["tiles"];
-        for (const layerName in layerMap) {
-          if (Object.prototype.hasOwnProperty.call(layerMap, layerName)) {
-            const layer = layerMap[layerName];
-            switch (layer["content_type"]) {
-              case "application/x-protobuf":
-                addPbfLayer(layerName, martinCatalogUrl.replace("catalog", layerName))
-                  .then((layer) => {
-                    addLayerToList(layer);
-                    message.success("Vector Tile加载成功！");
-                  })
-                  .catch((e: Error) => {
-                    message.error(e.message);
-                  });
-                break;
-            }
-          }
-        }
-
-      default:
-        break;
-    }
+  if (activeTab.value === "1") {
+    importVisible.value = false;
+    return;
   }
-  if (activeTab.value == 3) {
-    switch (textModel.type) {
-      case "GeoJSON":
-        addGeoJson(Date.now().toString(), JSON.parse(textModel.content))
-          .then((layer) => {
-            addLayerToList(layer);
-            message.success("GeoJSON加载成功！");
-          })
-          .catch((e: Error) => {
-            message.error(e.message);
-          });
-        break;
+
+  try {
+    if (activeTab.value === "2") {
+      if (urlModel.type === "Martin Catalog") {
+        await importMartinCatalog(urlModel.url);
+      } else {
+        const layerName = getUniqueLayerName(urlModel.layerName);
+        const layer = urlModel.type === "Tile"
+          ? await addTileLayer(layerName, urlModel.url)
+          : urlModel.type === "Vector Tile"
+            ? await addPbfLayer(layerName, urlModel.url)
+            : urlModel.type === "GeoJSON"
+              ? await addGeoJson(layerName, urlModel.url)
+              : undefined;
+
+        if (!layer) {
+          throw new Error(`暂不支持图层类型：${urlModel.type}`);
+        }
+        addLayerToList(layer);
+      }
+    } else if (activeTab.value === "3") {
+      const json = JSON.parse(textModel.content) as GeoJSON.GeoJSON;
+      const layerName = getUniqueLayerName(`geojson-${Date.now()}`);
+      addLayerToList(await addGeoJson(layerName, json));
     }
+
+    importVisible.value = false;
+    message.success("图层导入成功！");
+  } catch (error) {
+    message.error(`图层导入失败：${getErrorMessage(error)}`);
   }
 }
 
-function addLayerToList(layer) {
-  let key = layerList.value.length;
+function addLayerToList(layer: ManagedLayer) {
+  const key = nextLayerKey++;
   layerList.value.push({
     key: key,
     id: layer.id,
@@ -172,14 +197,14 @@ function addLayerToList(layer) {
   selectedLayers.value.push(key);
 }
 
-function onSelectLayerChange(selectedRowKeys, selectedRows) {
+function onSelectLayerChange(selectedRowKeys: Key[]) {
   selectedLayers.value = selectedRowKeys;
 }
 
-async function onSelectLayer(record, selected, selectedRows, nativeEvent) {
-  let layer = map.getLayer((record as Layer).id);
-  layer.visibility = selected ? "visible" : "none";
-  map.resize();
+function onSelectLayer(record: Layer, selected: boolean) {
+  for (const layerId of getLayerStyleIds(record)) {
+    map.setLayoutProperty(layerId, "visibility", selected ? "visible" : "none");
+  }
 }
 
 function githubHandle() {
@@ -187,7 +212,7 @@ function githubHandle() {
 }
 
 function helpHandle() {
-  message.warn("TODO");
+  message.info("支持 GeoJSON、XYZ 瓦片、矢量瓦片和 Martin Catalog。");
 }
 </script>
 
@@ -230,8 +255,6 @@ function helpHandle() {
                         <a-select-option value="GeoJSON">GeoJSON</a-select-option>
                         <a-select-option value="Tile">XYZ-Tile</a-select-option>
                         <a-select-option value="Vector Tile">Vector Tile</a-select-option>
-                        <a-select-option value="3D Tiles">3D Tiles</a-select-option>
-                        <a-select-option value="Terrain">Terrain</a-select-option>
                         <a-select-option value="Martin Catalog">Martin Catalog</a-select-option>
                       </a-select>
                     </a-form-item>
@@ -260,7 +283,7 @@ function helpHandle() {
           </a-col>
         </a-row>
       </div>
-      <a-table :dataSource="layerList" :columns="layerFields" size="small" tableLayout="fixed" :pagination="false"
+      <a-table :dataSource="filteredLayerList" :columns="layerFields" size="small" tableLayout="fixed" :pagination="false"
         :row-selection="{
           columnWidth: 10,
           selectedRowKeys: selectedLayers,

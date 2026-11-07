@@ -1,7 +1,5 @@
-import { center, flattenReduce, Point } from '@turf/turf'
-import { Map, Marker, LngLat, Popup, NavigationControl, StyleSpecification } from "maplibre-gl"
-import { geojson } from "flatgeobuf";
-import MaplibreGeocoder, { MaplibreGeocoderApi, MaplibreGeocoderFeatureResults } from '@maplibre/maplibre-gl-geocoder';
+import { center, Point } from '@turf/turf'
+import { Map, Marker, LngLat } from "maplibre-gl"
 import maplibregl from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css";
 import '@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css';
@@ -10,31 +8,19 @@ import '@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css';
 
 export var map: Map;
 
+export function destroyMap() {
+    map?.remove();
+    map = undefined as unknown as Map;
+}
+
 /**
  * 初始化地图
  */
 export function initMap(containerId: string): Map {
-    // 创建空白图层样式，用于地图初始化
-    const blankStyle: StyleSpecification = {
-        version: 8,
-        name: "BlankMap",
-        sources: {},
-        glyphs: "./data/glyphs/{fontstack}/{range}.pbf",
-        layers: [
-            {
-                id: "background",
-                type: "background",
-                paint: {
-                    // 'background-color': '#08294A' /* 背景颜色 */
-                    "background-color": "rgba(255, 255, 255, 0)" /* 背景颜色-透明 */,
-                },
-            },
-        ],
-    };
     // 初始化地图
     map = new Map({
         container: containerId, // container id
-        style: "https://demotiles.maplibre.org/style.json", // style URL
+        style: import.meta.env.VITE_MAP_STYLE_URL || "https://demotiles.maplibre.org/style.json",
         // style: "https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL",
         // style: blankStyle,
         center: [103, 38], // starting position [lng, lat]
@@ -53,8 +39,8 @@ export function initMap(containerId: string): Map {
 export function drawAnno(feature: maplibregl.MapGeoJSONFeature): maplibregl.Marker {
     let pos = center(feature.toJSON()).geometry as Point;
 
-    let htmlEle = new HTMLElement();
-    htmlEle.innerHTML = pos.coordinates[0] + "," + pos.coordinates[1];
+    let htmlEle = document.createElement("div");
+    htmlEle.textContent = pos.coordinates[0] + "," + pos.coordinates[1];
     var marker = new Marker({ element: htmlEle })
         .setLngLat(new LngLat(pos.coordinates[0], pos.coordinates[1]))
         .addTo(map);
@@ -69,7 +55,7 @@ export function markCurrentPos() {
     navigator.geolocation.getCurrentPosition(e => {
 
         let htmlEle = document.createElement('button');
-        htmlEle.innerHTML = e.coords.longitude + "," + e.coords.latitude;
+        htmlEle.textContent = e.coords.longitude + "," + e.coords.latitude;
         var marker = new Marker({ element: htmlEle })
             .setLngLat(new LngLat(e.coords.longitude, e.coords.latitude))
             .addTo(map);
@@ -79,7 +65,6 @@ export function markCurrentPos() {
         //     // 添加弹出框
         //     .setPopup(new Popup().setHTML(e.coords.longitude + "_" + e.coords.latitude + "_" + e.coords.altitude))
         //     .addTo(map);
-        // // console.log("当前定位显示了吗？？？");
     }, () => {
         alert("定位失败！");
     });

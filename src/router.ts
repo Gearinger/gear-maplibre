@@ -1,15 +1,9 @@
-import { createMemoryHistory, createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
-
-import GeojsonMap from './views/GeojsonMap.vue'
-import Home from './views/Home.vue'
-import Supabase from './views/Supabase.vue'
-
+import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
-    { path: '/', component: Home },
-    { path: '/home', component: Home },
-    { path: '/geojson', component: GeojsonMap },
-    // { path: '/supabase', component: Supabase },
+    { path: '/', component: () => import('./views/Home.vue') },
+    { path: '/home', component: () => import('./views/Home.vue') },
+    { path: '/geojson', component: () => import('./views/GeojsonMap.vue') },
 ]
 
 export const router = createRouter({

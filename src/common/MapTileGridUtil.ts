@@ -1,11 +1,12 @@
 import { GeoJSONSource } from "maplibre-gl";
 import { map } from "../common/MapUtil";
 
+let enabled = false;
+
 var listener = async () => {
     // 计算窗口范围内的瓦片坐标，并显示出每个瓦片的范围
     const bounds = map.getBounds();
     const zoom = Math.floor(map.getZoom() + 1);
-    // console.log(zoom);
     const tiles: { x: number; y: number; zoom: number }[] = [];
     const lngToTile = (lng: number, zoom: number) => Math.floor((lng + 180) / 360 * Math.pow(2, zoom));
     const latToTile = (lat: number, zoom: number) => Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
@@ -18,7 +19,7 @@ var listener = async () => {
             tiles.push({ x, y, zoom });
         }
     }
-    const features = tiles.map(tile => {
+    const features: GeoJSON.Feature<GeoJSON.Polygon, { x: number; y: number; zoom: number }>[] = tiles.map(tile => {
         const { x, y, zoom } = tile;
         const n = Math.pow(2, zoom);
         const lon1 = x / n * 360.0 - 180.0;
@@ -26,9 +27,9 @@ var listener = async () => {
         const lon2 = (x + 1) / n * 360.0 - 180.0;
         const lat2 = Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + 1) / n))) * 180.0 / Math.PI;
         return {
-            type: "Feature",
+            type: "Feature" as const,
             geometry: {
-                type: "Polygon",
+                type: "Polygon" as const,
                 coordinates: [[
                     [lon1, lat1],
                     [lon2, lat1],
@@ -45,13 +46,13 @@ var listener = async () => {
         };
     });
 
-    const geojson = {
+    const geojson: GeoJSON.FeatureCollection<GeoJSON.Polygon, { x: number; y: number; zoom: number }> = {
         type: "FeatureCollection",
         features
     };
 
     if (map.getSource('tile-grid')) {
-        (map.getSource('tile-grid') as GeoJSONSource).setData(geojson as any);
+        (map.getSource('tile-grid') as GeoJSONSource).setData(geojson);
     } else {
         map.addSource('tile-grid', { type: 'geojson', data: geojson });
 
@@ -82,14 +83,18 @@ var listener = async () => {
     }
 }
 export function enableTileGrid() {
+    if (enabled) return;
     listener();
     map.on("zoom", listener);
+    enabled = true;
 }
 
 export function disableTileGrid() {
+    if (!enabled) return;
     // 去除zoom事件
     map.off("zoom", listener);
-    map.removeLayer('tile-grid');
-    map.removeLayer('tile-grid-labels');
-    map.removeSource('tile-grid');
+    if (map.getLayer('tile-grid')) map.removeLayer('tile-grid');
+    if (map.getLayer('tile-grid-labels')) map.removeLayer('tile-grid-labels');
+    if (map.getSource('tile-grid')) map.removeSource('tile-grid');
+    enabled = false;
 }

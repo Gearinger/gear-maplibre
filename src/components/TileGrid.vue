@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { GeoJSONFeature, GeoJSONSource, Map, MapGeoJSONFeature, Source } from "maplibre-gl";
-import { ref, reactive, watch } from "vue";
-import { FeatureCollection, Geometry, feature } from '@turf/turf';
-import { Feature } from "flatgeobuf";
+import type { GeoJSONSource } from "maplibre-gl";
+import { ref, watch } from "vue";
 import { map } from "../common/MapUtil";
 
 
@@ -11,12 +9,10 @@ watch(
     () => map,
     (newValue, oldValue) => {
         if (once.value) {
-            console.log("TileGrid mounted");
             map.on("zoom", async () => {
                 // 计算窗口范围内的瓦片坐标，并显示出每个瓦片的范围
                 const bounds = map.getBounds();
                 const zoom = Math.floor(map.getZoom() + 1);
-                // console.log(zoom);
                 const tiles: { x: number; y: number; zoom: number }[] = [];
                 const lngToTile = (lng: number, zoom: number) => Math.floor((lng + 180) / 360 * Math.pow(2, zoom));
                 const latToTile = (lat: number, zoom: number) => Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
@@ -29,7 +25,7 @@ watch(
                         tiles.push({ x, y, zoom });
                     }
                 }
-                const features = tiles.map(tile => {
+                const features: GeoJSON.Feature<GeoJSON.Polygon, { x: number; y: number; zoom: number }>[] = tiles.map(tile => {
                     const { x, y, zoom } = tile;
                     const n = Math.pow(2, zoom);
                     const lon1 = x / n * 360.0 - 180.0;
@@ -37,9 +33,9 @@ watch(
                     const lon2 = (x + 1) / n * 360.0 - 180.0;
                     const lat2 = Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + 1) / n))) * 180.0 / Math.PI;
                     return {
-                        type: "Feature",
+                        type: "Feature" as const,
                         geometry: {
-                            type: "Polygon",
+                            type: "Polygon" as const,
                             coordinates: [[
                                 [lon1, lat1],
                                 [lon2, lat1],
@@ -56,7 +52,7 @@ watch(
                     };
                 });
 
-                const geojson = {
+                const geojson: GeoJSON.FeatureCollection<GeoJSON.Polygon> = {
                     type: "FeatureCollection",
                     features
                 };

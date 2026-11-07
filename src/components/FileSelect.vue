@@ -1,69 +1,58 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import {
-    InboxOutlined,
-} from "@ant-design/icons-vue";
+import { ref } from 'vue'
 
 const props = withDefaults(defineProps<{
     exts?: string[]
 }>(),
     {
-        exts: () => ['json', 'geojson', 'shp']
+        exts: () => ['json', 'geojson']
     }
 );
 
 const emit = defineEmits<{
-    (e: 'load-file', fileName: string, reader: FileReader): void;
+    (e: 'load-file', fileName: string, content: string): void;
 }>();
 
 const fileAreaActive = ref(false);
+const fileInput = ref<HTMLInputElement>();
 
-async function dragLoadFileHandle(event) {
-    let files: File[] = event.dataTransfer.files;
-    // console.log(files);
+function getExtension(fileName: string) {
+    return fileName.split('.').pop()?.toLowerCase() ?? '';
+}
+
+async function loadFiles(files: File[]) {
     for (const file of files) {
-        console.log(file);
-        
         const fileName = file.name;
-        const ext = fileName.split(".")[1];
-        if (props.exts && !props.exts.includes(ext)) {
+        const ext = getExtension(fileName);
+        if (!props.exts.includes(ext)) {
             alert(`Unsupported file: ${fileName}`);
-            continue; // Skip files with unsupported extensions
+            continue;
         }
-        await (async () => {
-            const reader = new FileReader();
-            reader.addEventListener("load", async () => {
-                emit("load-file", fileName, reader)
-            });
-            reader.readAsText(file);
-        })
+        try {
+            emit("load-file", fileName, await file.text());
+        } catch (error) {
+            alert(`读取文件失败：${fileName}`);
+            console.error(error);
+        }
     }
-    fileAreaActive.value = false; // Reset the active state after handling the drop
 }
 
-async function clickLoadFileHandle(event) {
-
-    const [fileHandle] = await window.showOpenFilePicker({
-        types: props.exts.map(p => {
-            return {
-                rescription: p,
-                accept: {
-                    "*/*": ["." + p]
-                }
-            }
-        }),
-        // 可以选择多个图片
-        multiple: true,
-    });
-    const file: File = await fileHandle.getFile();
-    const fileName = file.name;
-    const reader = new FileReader();
-    reader.addEventListener("load", async () => {
-        emit("load-file", fileName, reader)
-    });
-    reader.readAsText(file);
+function openFilePicker() {
+    fileInput.value?.click();
 }
 
+async function inputLoadFileHandle(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files) await loadFiles(Array.from(input.files));
+    input.value = '';
+}
+
+async function dragLoadFileHandle(event: DragEvent) {
+    fileAreaActive.value = false;
+    if (event.dataTransfer?.files) {
+        await loadFiles(Array.from(event.dataTransfer.files));
+    }
+}
 </script>
 
 <template>
@@ -72,7 +61,9 @@ async function clickLoadFileHandle(event) {
         active: fileAreaActive,
     }" @drop.prevent="dragLoadFileHandle" @dragleave.prevent="fileAreaActive = false"
         @dragover.prevent="fileAreaActive = true" @dragenter.prevent="fileAreaActive = true"
-        @click="clickLoadFileHandle" pr>
+        @click="openFilePicker">
+        <input ref="fileInput" class="file-input" type="file" :accept="props.exts.map(ext => '.' + ext).join(',')"
+            multiple hidden @click.stop @change="inputLoadFileHandle">
         <p class="file-import-area-icon">
             <inbox-outlined></inbox-outlined>
         </p>
@@ -80,10 +71,10 @@ async function clickLoadFileHandle(event) {
             Click or drag file to this area to load
         </p>
         <p class="file-import-area-hint">
-            Support for a single or multy files. Coordinate system
+            Support for one or more files. Coordinate system
             must be 'EPSG:4326'
             <br />
-            *.json ( GeoJSON ) | *.shp ( ShpFile )
+            *.json | *.geojson
         </p>
     </div>
 </template>

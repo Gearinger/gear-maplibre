@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { Map } from "maplibre-gl";
-import { reactive, onMounted, watch, ref } from "vue";
-import { MapMouseMoveHandlers } from "../common/MapEventUtil";
+import { onBeforeUnmount, onMounted, reactive } from "vue";
+import { addMouseMoveHandler } from "../common/MapEventUtil";
 
 const pos = reactive({
   x: "0",
@@ -9,11 +8,16 @@ const pos = reactive({
 });
 
 
-MapMouseMoveHandlers.push((e: any) => {
-  pos.x = e.lngLat.lng.toFixed(7);
-  pos.y = e.lngLat.lat.toFixed(7);
+let unsubscribe: (() => void) | undefined;
+
+onMounted(() => {
+  unsubscribe = addMouseMoveHandler((event) => {
+    pos.x = event.lngLat.lng.toFixed(7);
+    pos.y = event.lngLat.lat.toFixed(7);
+  });
 });
 
+onBeforeUnmount(() => unsubscribe?.());
 </script>
 
 <template>

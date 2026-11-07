@@ -1,27 +1,42 @@
 <script lang="ts" setup>
-import { onMounted, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { Codemirror } from "vue-codemirror";
 import { json } from "@codemirror/lang-json";
 
-const content = ref('');
+const props = withDefaults(defineProps<{ modelValue?: string }>(), {
+    modelValue: '',
+});
+const emit = defineEmits<{
+    (e: 'update:modelValue', value: string): void;
+}>();
 
-const model = defineModel();
+const content = ref(props.modelValue);
 
 function clear() {
     content.value = '';
 }
 
-watch(model, (newVal) => {
-    const json = JSON.parse(newVal as string);
-    content.value = JSON.stringify(json, null, 2);
+watch(() => props.modelValue, (newValue) => {
+    if (newValue === content.value) return;
+    content.value = newValue;
+    try {
+        content.value = JSON.stringify(JSON.parse(newValue), null, 2);
+    } catch {
+        // 外部内容可能仍是用户正在编辑的无效 JSON。
+    }
 });
 
+watch(content, (newValue) => {
+    if (newValue !== props.modelValue) {
+        emit('update:modelValue', newValue);
+    }
+});
 </script>
 
 <template>
     <div class="text-content">
         <button @click="clear">clear </button>
-        <codemirror class="my-codemirror" v-model="content" @update="model = content" placeholder="Code goes here..."
+        <codemirror class="my-codemirror" v-model="content" placeholder="Code goes here..."
             :autofocus="true" :tabSize="2" :extensions="[json()]" />
     </div>
 </template>

@@ -1,1 +1,1 @@
-bun run vite
+bun run dev

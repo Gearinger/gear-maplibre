@@ -1,13 +1,50 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import maplibregl from "maplibre-gl"
 
-import Ant from "ant-design-vue";
+import {
+  Button,
+  Col,
+  Descriptions,
+  DescriptionsItem,
+  Form,
+  FormItem,
+  Input,
+  Modal,
+  Row,
+  Select,
+  SelectOption,
+  Table,
+  TabPane,
+  Tabs,
+  Textarea,
+  Tooltip,
+} from "ant-design-vue";
 import { router } from './router';
-// import "ant-design-vue/dist/antd.css";
 
-let app = createApp(App);
-app.use(Ant);
+const app = createApp(App);
+
+const components = {
+  AButton: Button,
+  ACol: Col,
+  ADescriptions: Descriptions,
+  ADescriptionsItem: DescriptionsItem,
+  AForm: Form,
+  AFormItem: FormItem,
+  AInput: Input,
+  AModal: Modal,
+  ARow: Row,
+  ASelect: Select,
+  ASelectOption: SelectOption,
+  ATable: Table,
+  ATabPane: TabPane,
+  ATabs: Tabs,
+  ATextarea: Textarea,
+  ATooltip: Tooltip,
+};
+
+for (const [name, component] of Object.entries(components)) {
+  app.component(name, component);
+}
+
 app.use(router);
 app.mount('#app')
-app.config.globalProperties.$maplibregl = ()=>maplibregl
