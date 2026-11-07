@@ -18,6 +18,15 @@
 
       <main class="map-pane">
         <Map />
+        <div v-if="activeLayer?.type === 'GeoJSON' && activeLayer.data" class="draw-toolbar">
+          <span class="draw-toolbar-label">绘制</span>
+          <button :class="{ active: drawMode === 'draw_point' }" @click="startDrawing('draw_point')">点</button>
+          <button :class="{ active: drawMode === 'draw_line_string' }"
+            @click="startDrawing('draw_line_string')">线</button>
+          <button :class="{ active: drawMode === 'draw_polygon' }"
+            @click="startDrawing('draw_polygon')">面</button>
+          <button v-if="drawMode" @click="stopDrawing">结束</button>
+        </div>
         <div v-if="layers.length === 0" class="map-empty-state">
           <div class="empty-card">
             <div class="empty-kicker">GEAR MAP</div>
@@ -57,7 +66,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { bbox } from "@turf/turf";
 import { message } from "ant-design-vue";
-import type { MapLayerMouseEvent } from "maplibre-gl";
+import type { IControl, MapLayerMouseEvent } from "maplibre-gl";
+import MapboxDraw from "@mapbox/mapbox-gl-draw";
+import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import Map from "../components/Map.vue";
 import TopMenu from "../components/TopMenu.vue";
 import LayerManager from "../components/LayerManager.vue";
@@ -65,6 +76,10 @@ import TextContent from "../components/TextContent.vue";
 import FeatureInspector from "../components/FeatureInspector.vue";
 import LayerStyleEditor from "../components/LayerStyleEditor.vue";
 import { map } from "../common/MapUtil";
+import {
+  appendGeoJsonFeatures,
+  findGeoJsonFeatureIndex,
+} from "../common/GeoJsonUtil";
 import {
   addGeoJson,
   addPbfLayer,
@@ -101,11 +116,20 @@ const {
 
 const editorContent = ref("");
 const projectInput = ref<HTMLInputElement>();
+const drawMode = ref<DrawMode | null>(null);
+let draw: MapboxDraw | undefined;
 let editorSync = false;
 let editorTimer: ReturnType<typeof setTimeout> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let persistenceReady = false;
 let mapEventsReady = false;
+
+type DrawMode = "draw_point" | "draw_line_string" | "draw_polygon";
+type DrawCreatedEvent = { features: GeoJSON.Feature[] };
+type DrawEventMap = {
+  on(type: "draw.create", listener: (event: DrawCreatedEvent) => void): unknown;
+  off(type: "draw.create", listener: (event: DrawCreatedEvent) => void): unknown;
+};
 
 const canExportGeoJson = computed(() =>
   activeLayer.value?.type === "GeoJSON" && Boolean(activeLayer.value.data)
@@ -120,6 +144,10 @@ watch(activeLayer, (layer) => {
   queueMicrotask(() => {
     editorSync = false;
   });
+});
+
+watch(activeLayerKey, () => {
+  stopDrawing();
 });
 
 watch(
@@ -229,6 +257,67 @@ function applyEditorContent(value: string) {
   }, 350);
 }
 
+function startDrawing(mode: DrawMode) {
+  const layer = activeLayer.value;
+  if (!draw || !layer?.data || layer.type !== "GeoJSON") {
+    message.warning("请先选择一个包含数据的 GeoJSON 图层");
+    return;
+  }
+  draw.deleteAll();
+  (draw.changeMode as unknown as (mode: DrawMode) => void)(mode);
+  drawMode.value = mode;
+}
+
+function stopDrawing() {
+  if (!draw) return;
+  draw.deleteAll();
+  draw.changeMode("simple_select");
+  drawMode.value = null;
+}
+
+function onDrawCreated(event: DrawCreatedEvent) {
+  const layer = activeLayer.value;
+  if (!layer?.data || layer.type !== "GeoJSON") {
+    message.warning("当前没有可编辑的 GeoJSON 图层");
+    return stopDrawing();
+  }
+
+  const startIndex = layer.data.type === "FeatureCollection"
+    ? layer.data.features.length
+    : 1;
+  const data = appendGeoJsonFeatures(layer.data, event.features);
+  layer.data = data;
+  updateManagedGeoJson(layer, data);
+  stopDrawing();
+
+  const feature = event.features[0];
+  if (feature) {
+    selectedFeature.value = {
+      id: feature.id,
+      featureIndex: startIndex,
+      layerKey: layer.key,
+      layerName: layer.name,
+      source: layer.source,
+      geometryType: feature.geometry?.type ?? "Unknown",
+      properties: feature.properties ?? {},
+      feature,
+    };
+    rightPanelTab.value = "feature";
+    rightPanelOpen.value = true;
+  }
+  message.success("要素已添加，右侧可以继续编辑属性");
+}
+
+function setupDrawing() {
+  if (draw) return;
+  draw = new MapboxDraw({
+    displayControlsDefault: false,
+    controls: {},
+  });
+  map.addControl(draw as unknown as IControl, "top-right");
+  (map as unknown as DrawEventMap).on("draw.create", onDrawCreated);
+}
+
 function findLayerForFeature(layerId: string) {
   return layers.value.find((layer) => layer.styleLayerIds.includes(layerId));
 }
@@ -252,6 +341,7 @@ function onMapClick(event: MapLayerMouseEvent) {
   const geojson = hit.feature.toJSON() as GeoJSON.Feature;
   selectedFeature.value = {
     id: hit.feature.id,
+    featureIndex: findGeoJsonFeatureIndex(hit.layer.data, hit.feature.id),
     layerKey: hit.layer.key,
     layerName: hit.layer.name,
     source: hit.layer.source,
@@ -285,6 +375,7 @@ function registerMapEvents() {
   if (mapEventsReady) return;
   map.on("click", onMapClick);
   map.on("mousemove", onPointerMove);
+  setupDrawing();
   mapEventsReady = true;
 }
 
@@ -363,6 +454,11 @@ onBeforeUnmount(() => {
     map.off("click", onMapClick);
     map.off("mousemove", onPointerMove);
   }
+  if (draw) {
+    (map as unknown as DrawEventMap).off("draw.create", onDrawCreated);
+    map.removeControl(draw as unknown as IControl);
+    draw = undefined;
+  }
 });
 </script>
 
@@ -416,6 +512,46 @@ onBeforeUnmount(() => {
   min-width: 0;
   overflow: hidden;
   background: #0e1820;
+}
+
+.draw-toolbar {
+  position: absolute;
+  z-index: 8;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  background: rgba(25, 25, 35, 0.92);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.draw-toolbar-label {
+  padding: 0 6px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.draw-toolbar button {
+  min-width: 36px;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.78);
+  background: transparent;
+  cursor: pointer;
+}
+
+.draw-toolbar button:hover,
+.draw-toolbar button.active {
+  color: #0f1720;
+  background: #5eead4;
 }
 
 .map-empty-state {

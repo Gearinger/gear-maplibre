@@ -29,6 +29,7 @@ export interface WorkspaceLayer extends ManagedLayer {
 
 export interface InspectedFeature {
   id?: string | number;
+  featureIndex?: number;
   layerKey: string;
   layerName: string;
   source: string;
