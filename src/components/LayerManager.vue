@@ -4,6 +4,10 @@ import {
   GithubOutlined,
   QuestionCircleOutlined,
   DeleteOutlined,
+  EyeOutlined,
+  EyeInvisibleOutlined,
+  AimOutlined,
+  PlusOutlined,
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 import { map } from "../common/MapUtil";
@@ -12,27 +16,30 @@ import {
   addGeoJson,
   addPbfLayer,
   addTileLayer,
-  type ManagedLayer,
+  fitManagedLayer,
+  removeManagedLayer,
+  setManagedLayerOpacity,
+  setManagedLayerVisibility,
 } from "../common/MapLayerUtil";
+import { useWorkspace } from "../stores/workspace";
+import type { WorkspaceLayer } from "../types/workspace";
 
-type Key = string | number;
-
-interface Layer {
-  key: Key;
-  id: string;
-  type: string;
-  source: string;
-}
+const workspace = useWorkspace();
+const {
+  layers,
+  activeLayerKey,
+  selectedFeature,
+  projectName,
+} = workspace;
 
 /**
  * 图层搜索内容
  */
 const searchLayerContent = ref("");
-const layerList = ref<Layer[]>([]);
-const selectedLayers = ref<Key[]>([]);
 const importVisible = ref(false);
 const activeTab = ref("1");
-let nextLayerKey = 0;
+const editingKey = ref("");
+const editingName = ref("");
 
 const textModel = reactive({
   type: "GeoJSON",
@@ -47,29 +54,43 @@ const urlModel = reactive({
 
 const filteredLayerList = computed(() => {
   const query = searchLayerContent.value.trim().toLowerCase();
-  if (!query) return layerList.value;
-  return layerList.value.filter((layer) =>
-    [layer.id, layer.type, layer.source].some((value) =>
-      value.toLowerCase().includes(query)
+  if (!query) return layers.value;
+  return layers.value.filter((layer) =>
+    [layer.name, layer.id, layer.type, layer.source].some((value) =>
+      value?.toLowerCase().includes(query)
     )
   );
 });
 
 const layerFields = [
   {
-    title: "id",
-    dataIndex: "id",
-    width: 30,
+    title: "图层",
+    dataIndex: "name",
+    width: 130,
+    slots: { customRender: "name" },
   },
   {
-    title: "type",
+    title: "类型",
     dataIndex: "type",
-    width: 20,
+    width: 75,
     align: "center",
   },
   {
-    title: "operation",
-    width: 30,
+    title: "要素",
+    dataIndex: "featureCount",
+    width: 50,
+    align: "center",
+  },
+  {
+    title: "透明度",
+    dataIndex: "opacity",
+    width: 85,
+    align: "center",
+    slots: { customRender: "opacity" },
+  },
+  {
+    title: "操作",
+    width: 65,
     align: "center",
     dataIndex: "operation",
     slots: { customRender: "operation" },
@@ -97,7 +118,7 @@ async function loadFile(fileName: string, content: string) {
   try {
     const json = JSON.parse(content) as GeoJSON.GeoJSON;
     const sourceName = getUniqueLayerName(fileName.replace(/\.[^.]+$/, ""));
-    addLayerToList(await addGeoJson(sourceName, json));
+    workspace.addLayer(await addGeoJson(sourceName, json), fileName.replace(/\.[^.]+$/, ""));
     importVisible.value = false;
     message.success(`${fileName} 加载成功`);
   } catch (error) {
@@ -105,21 +126,10 @@ async function loadFile(fileName: string, content: string) {
   }
 }
 
-function getLayerStyleIds(layer: Layer) {
-  return (map.getStyle().layers ?? [])
-    .filter((styleLayer) => "source" in styleLayer && styleLayer.source === layer.source)
-    .map((styleLayer) => styleLayer.id);
-}
-
-async function deleteLayer(layer: Layer) {
+async function deleteLayer(layer: WorkspaceLayer) {
   try {
-    for (const layerId of getLayerStyleIds(layer)) {
-      if (map.getLayer(layerId)) map.removeLayer(layerId);
-    }
-    if (map.getSource(layer.source)) map.removeSource(layer.source);
-
-    layerList.value = layerList.value.filter((item) => item.key !== layer.key);
-    selectedLayers.value = selectedLayers.value.filter((key) => key !== layer.key);
+    removeManagedLayer(layer);
+    workspace.removeLayer(layer.key);
     message.success("图层删除成功！");
   } catch (error) {
     message.error(`图层删除失败：${getErrorMessage(error)}`);
@@ -140,7 +150,7 @@ async function importMartinCatalog(catalogUrl: string) {
     if (layerMap[layerName].content_type !== "application/x-protobuf") continue;
     const uniqueName = getUniqueLayerName(layerName);
     const tileUrl = catalogUrl.replace(/catalog\/?$/, uniqueName);
-    addLayerToList(await addPbfLayer(uniqueName, tileUrl));
+    workspace.addLayer(await addPbfLayer(uniqueName, tileUrl), layerName);
     loaded++;
   }
 
@@ -170,12 +180,12 @@ async function importfinish() {
         if (!layer) {
           throw new Error(`暂不支持图层类型：${urlModel.type}`);
         }
-        addLayerToList(layer);
+        workspace.addLayer(layer, urlModel.layerName || layer.id);
       }
     } else if (activeTab.value === "3") {
       const json = JSON.parse(textModel.content) as GeoJSON.GeoJSON;
       const layerName = getUniqueLayerName(`geojson-${Date.now()}`);
-      addLayerToList(await addGeoJson(layerName, json));
+      workspace.addLayer(await addGeoJson(layerName, json), "粘贴的 GeoJSON");
     }
 
     importVisible.value = false;
@@ -185,25 +195,60 @@ async function importfinish() {
   }
 }
 
-function addLayerToList(layer: ManagedLayer) {
-  const key = nextLayerKey++;
-  layerList.value.push({
-    key: key,
-    id: layer.id,
-    type: layer.type,
-    source: layer.source
-  });
-  selectedLayers.value.push(key);
-}
-
-function onSelectLayerChange(selectedRowKeys: Key[]) {
-  selectedLayers.value = selectedRowKeys;
-}
-
-function onSelectLayer(record: Layer, selected: boolean) {
-  for (const layerId of getLayerStyleIds(record)) {
-    map.setLayoutProperty(layerId, "visibility", selected ? "visible" : "none");
+async function loadSample() {
+  try {
+    const response = await fetch(`${import.meta.env.BASE_URL}data/smallGeoJSON.geojson`);
+    if (!response.ok) throw new Error(`请求失败：${response.status}`);
+    const data = await response.json() as GeoJSON.GeoJSON;
+    workspace.addLayer(
+      await addGeoJson(getUniqueLayerName("示例数据"), data),
+      "示例数据"
+    );
+    message.success("示例数据加载成功");
+  } catch (error) {
+    message.error(`示例数据加载失败：${getErrorMessage(error)}`);
   }
+}
+
+function setActiveLayer(layer: WorkspaceLayer) {
+  activeLayerKey.value = layer.key;
+  selectedFeature.value = undefined;
+}
+
+function rowProps(layer: WorkspaceLayer) {
+  return {
+    onClick: () => setActiveLayer(layer),
+    class: layer.key === activeLayerKey.value ? "active-layer-row" : "",
+  };
+}
+
+function toggleVisibility(layer: WorkspaceLayer) {
+  layer.visible = !layer.visible;
+  setManagedLayerVisibility(layer, layer.visible);
+}
+
+function changeOpacity(event: Event, layer: WorkspaceLayer) {
+  const value = Number((event.target as HTMLInputElement).value) / 100;
+  layer.opacity = value;
+  setManagedLayerOpacity(layer, value);
+}
+
+function focusLayer(layer: WorkspaceLayer) {
+  setActiveLayer(layer);
+  if (!fitManagedLayer(layer)) {
+    message.info("该图层没有可用的范围信息");
+  }
+}
+
+function startRename(layer: WorkspaceLayer) {
+  editingKey.value = layer.key;
+  editingName.value = layer.name;
+}
+
+function commitRename(layer: WorkspaceLayer) {
+  const name = editingName.value.trim();
+  if (name) layer.name = name;
+  editingKey.value = "";
 }
 
 function githubHandle() {
@@ -221,8 +266,8 @@ function helpHandle() {
       <a-form>
         <a-row class="layer-manager-menu-top">
           <a-col :span="16">
-            <div style="font-size: 18px">Gear-Map</div>
-            <div style="font-size: 9px; opacity: 0.6">version 0.0.1</div>
+            <div style="font-size: 15px">图层资源</div>
+            <div style="font-size: 10px; opacity: 0.6">{{ projectName }}</div>
           </a-col>
           <a-col :span="8" class="layer-manager-menu-top-btn">
             <GithubOutlined @click="githubHandle" />
@@ -237,11 +282,16 @@ function helpHandle() {
     <div class="layer-manager-layer-list">
       <div class="layer-manager-layer-list-search">
         <a-row>
-          <a-col :span="20">
+          <a-col :span="12">
             <a-input v-model:value="searchLayerContent" placeholder="Layer Search..."></a-input>
           </a-col>
-          <a-col :span="4">
-            <a-button block @click="importVisible = true">+</a-button>
+          <a-col :span="6">
+            <a-button block title="加载示例数据" @click="loadSample">示例</a-button>
+          </a-col>
+          <a-col :span="6">
+            <a-button block type="primary" title="导入图层" @click="importVisible = true">
+              <template #icon><PlusOutlined /></template>
+            </a-button>
             <a-modal v-model:open="importVisible" @ok="importfinish">
               <a-tabs size="small" v-model:activeKey="activeTab">
                 <a-tab-pane key="1" tab="file">
@@ -282,15 +332,29 @@ function helpHandle() {
           </a-col>
         </a-row>
       </div>
-      <a-table :dataSource="filteredLayerList" :columns="layerFields" size="small" tableLayout="fixed" :pagination="false"
-        :row-selection="{
-          columnWidth: 10,
-          selectedRowKeys: selectedLayers,
-          onChange: onSelectLayerChange,
-          onSelect: onSelectLayer,
-        }">
+      <a-table :dataSource="filteredLayerList" :columns="layerFields" size="small" tableLayout="fixed"
+        :pagination="false" :customRow="rowProps" :scroll="{ x: 380 }">
+        <template #name="{ record }">
+          <div class="layer-name-cell" @dblclick.stop="startRename(record)">
+            <button class="visibility-button" :title="record.visible ? '隐藏图层' : '显示图层'"
+              @click.stop="toggleVisibility(record)">
+              <EyeOutlined v-if="record.visible" />
+              <EyeInvisibleOutlined v-else />
+            </button>
+            <a-input v-if="editingKey === record.key" v-model:value="editingName" size="small"
+              @click.stop @blur="commitRename(record)" @pressEnter="commitRename(record)" />
+            <span v-else class="layer-name">{{ record.name }}</span>
+          </div>
+        </template>
+        <template #opacity="{ record }">
+          <input class="opacity-input" type="range" min="0" max="100" :value="record.opacity * 100"
+            @click.stop @input="changeOpacity($event, record)">
+        </template>
         <template #operation="{ record }">
-          <a-button shape="circle" danger size="small" type="text" @click="deleteLayer(record)">
+          <a-button title="定位图层" size="small" type="text" @click.stop="focusLayer(record)">
+            <template #icon><AimOutlined /></template>
+          </a-button>
+          <a-button shape="circle" danger size="small" type="text" @click.stop="deleteLayer(record)">
             <template #icon>
               <DeleteOutlined />
             </template>
@@ -305,11 +369,13 @@ function helpHandle() {
 @import "../assets/main.less";
 
 .layer-manager {
-  position: absolute;
+  position: relative;
   background-color: @global_bg_color;
-  width: 300px;
-  height: calc(100% - 40px);
-  margin: 20px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .layer-manager-menu-top {
@@ -334,17 +400,64 @@ function helpHandle() {
 }
 
 .layer-manager-menu {
-  padding: 15px 22px;
+  flex: none;
+  padding: 14px 16px;
 }
 
 .layer-manager-layer-list {
-  padding: 20px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
   text-align: center;
   border-top: 1px solid rgb(80, 80, 80);
 }
 
 .layer-manager-layer-list-search {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   margin-bottom: 10px;
+  padding-bottom: 6px;
+  background: @global_bg_color;
+}
+
+.layer-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.layer-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visibility-button {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.opacity-input {
+  width: 64px;
+  cursor: pointer;
+  accent-color: #38bdf8;
+}
+
+.active-layer-row > td {
+  background: rgba(56, 189, 248, 0.12) !important;
+}
+
+.ant-table-row {
+  cursor: pointer;
 }
 
 .file-import-area {

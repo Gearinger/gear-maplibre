@@ -1,11 +1,18 @@
 import { geojson } from "flatgeobuf";
 import { bbox } from "@turf/turf";
+import type { GeoJSONSource } from "maplibre-gl";
 import { map } from "./MapUtil";
+import type { LayerBounds, ManagedLayer } from "../types/workspace";
 
-export interface ManagedLayer {
-    id: string;
-    type: string;
-    source: string;
+function getFeatureCount(data: GeoJSON.GeoJSON) {
+    return "features" in data ? data.features.length : 1;
+}
+
+function getBounds(data: GeoJSON.GeoJSON): LayerBounds | undefined {
+    const bounds = bbox(data);
+    return bounds.every(Number.isFinite)
+        ? [bounds[0], bounds[1], bounds[2], bounds[3]]
+        : undefined;
 }
 
 /**
@@ -13,7 +20,10 @@ export interface ManagedLayer {
  * @param fgb FlatGeobuf
  * @param map 地图
  */
-export async function addFlatGeoBuf(fgb: string | Uint8Array | ReadableStream) {
+export async function addFlatGeoBuf(
+    fgb: string | Uint8Array | ReadableStream,
+    sourceName = "flatgeobuf"
+): Promise<ManagedLayer> {
     const fc: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
     let i = 0;
 
@@ -21,14 +31,14 @@ export async function addFlatGeoBuf(fgb: string | Uint8Array | ReadableStream) {
         fc.features.push({ ...f, id: i++ });
     }
 
-    map.addSource("counties", {
+    map.addSource(sourceName, {
         type: "geojson",
         data: fc,
     });
     map.addLayer({
-        id: "counties-fill",
+        id: `${sourceName}-fill`,
         type: "fill",
-        source: "counties",
+        source: sourceName,
         paint: {
             "fill-color": "#0000FF",
             "fill-opacity": [
@@ -40,10 +50,14 @@ export async function addFlatGeoBuf(fgb: string | Uint8Array | ReadableStream) {
         },
     });
     return {
-        id: "counties-fill",
+        id: sourceName,
         type: "FlatGeobuf",
-        source: "counties",
-    } satisfies ManagedLayer;
+        source: sourceName,
+        styleLayerIds: [`${sourceName}-fill`],
+        data: fc,
+        featureCount: fc.features.length,
+        bounds: getBounds(fc),
+    };
 }
 
 /**
@@ -128,10 +142,22 @@ export async function addGeoJson(
         throw error;
     }
 
+    const styleLayerIds = [
+        `${sourceName}-fill`,
+        `${sourceName}-line`,
+        `${sourceName}-point`,
+        ...(annoField ? [`${sourceName}-label`] : []),
+    ];
+
     return {
         id: sourceName,
         type: "GeoJSON",
         source: sourceName,
+        styleLayerIds,
+        data: typeof json === "string" ? undefined : json,
+        url: typeof json === "string" ? json : undefined,
+        featureCount: typeof json === "string" ? undefined : getFeatureCount(json),
+        bounds: typeof json === "string" ? undefined : getBounds(json),
     };
 }
 
@@ -168,6 +194,8 @@ export async function addPbfLayer(
         id: layerName,
         type: "Vector Tile",
         source,
+        styleLayerIds: [layerName],
+        url: vectorTileUrl,
     };
 }
 
@@ -202,5 +230,69 @@ export async function addTileLayer(layerName: string, url: string): Promise<Mana
         id: layerName,
         type: "XYZ-Tile",
         source,
+        styleLayerIds: [layerName],
+        url,
     };
+}
+
+export function setManagedLayerVisibility(layer: ManagedLayer, visible: boolean) {
+    for (const layerId of layer.styleLayerIds) {
+        if (map.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+        }
+    }
+}
+
+export function setManagedLayerOpacity(layer: ManagedLayer, opacity: number) {
+    const value = Math.min(1, Math.max(0, opacity));
+    for (const layerId of layer.styleLayerIds) {
+        const styleLayer = map.getLayer(layerId);
+        if (!styleLayer) continue;
+
+        switch (styleLayer.type) {
+            case "fill":
+                map.setPaintProperty(layerId, "fill-opacity", value);
+                break;
+            case "line":
+                map.setPaintProperty(layerId, "line-opacity", value);
+                break;
+            case "circle":
+                map.setPaintProperty(layerId, "circle-opacity", value);
+                break;
+            case "raster":
+                map.setPaintProperty(layerId, "raster-opacity", value);
+                break;
+            case "symbol":
+                map.setPaintProperty(layerId, "icon-opacity", value);
+                map.setPaintProperty(layerId, "text-opacity", value);
+                break;
+        }
+    }
+}
+
+export function fitManagedLayer(layer: ManagedLayer) {
+    if (!layer.bounds) return false;
+    map.fitBounds(
+        [[layer.bounds[0], layer.bounds[1]], [layer.bounds[2], layer.bounds[3]]],
+        { padding: 60, maxZoom: 16 }
+    );
+    return true;
+}
+
+export function updateManagedGeoJson(layer: ManagedLayer, data: GeoJSON.GeoJSON) {
+    const source = map.getSource(layer.source) as GeoJSONSource | undefined;
+    if (!source || typeof source.setData !== "function") {
+        throw new Error("当前图层不是可更新的 GeoJSON 数据源");
+    }
+    source.setData(data);
+    layer.data = data;
+    layer.featureCount = getFeatureCount(data);
+    layer.bounds = getBounds(data);
+}
+
+export function removeManagedLayer(layer: ManagedLayer) {
+    for (const layerId of layer.styleLayerIds) {
+        if (map.getLayer(layerId)) map.removeLayer(layerId);
+    }
+    if (map.getSource(layer.source)) map.removeSource(layer.source);
 }

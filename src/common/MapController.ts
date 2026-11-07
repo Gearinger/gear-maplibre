@@ -1,9 +1,7 @@
 import * as maplibregl from "maplibre-gl";
-import { NavigationControl, Map, IControl } from "maplibre-gl";
+import { NavigationControl, Map } from "maplibre-gl";
 import { map } from "./MapUtil";
 import MaplibreGeocoder, { MaplibreGeocoderApi, MaplibreGeocoderFeatureResults } from "@maplibre/maplibre-gl-geocoder";
-import MapboxDraw from "@mapbox/mapbox-gl-draw";
-import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 
 /**
  * 添加地理编码控件
@@ -77,8 +75,3 @@ export function addNavigationControl(): Map {
     map.addControl(new NavigationControl({}))
     return map;
 };
-
-export function addDrawControl(): Map {
-    map.addControl(new MapboxDraw() as unknown as IControl);
-    return map;
-}

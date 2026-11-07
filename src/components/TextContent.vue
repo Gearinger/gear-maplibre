@@ -35,28 +35,42 @@ watch(content, (newValue) => {
 
 <template>
     <div class="text-content">
-        <button @click="clear">clear </button>
-        <codemirror class="my-codemirror" v-model="content" placeholder="Code goes here..."
-            :autofocus="true" :tabSize="2" :extensions="[json()]" />
+        <div class="editor-toolbar">
+            <span>GeoJSON</span>
+            <a-button size="small" @click="clear">清空</a-button>
+        </div>
+        <codemirror class="my-codemirror" v-model="content" placeholder="粘贴或编辑 GeoJSON..."
+            :tabSize="2" :extensions="[json()]" />
     </div>
 </template>
 
-<style>
+<style scoped>
 .text-content {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 1000;
-    background-color: rgba(255, 255, 255, 1);
-    padding: 10px;
-    border-radius: 5px;
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .cm-editor {
-    width: 400px;
-    height: calc(100vh - 100px);
+    width: 100%;
+    height: calc(100vh - 190px);
     font-family: 'Fira Code', monospace;
-    font-size: 14px;
+    font-size: 12px;
     line-height: 1.6;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
 }
 </style>

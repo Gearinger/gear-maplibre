@@ -1,4 +1,16 @@
-此项目使用 Bun 管理和构建。添加了方便调试的小工具。
+此项目是一个本地优先的 GeoJSON 与地图瓦片检查工作台。
+
+主要功能：
+
+- 导入本地 GeoJSON、URL 数据、XYZ 瓦片、矢量瓦片和 Martin Catalog。
+- 图层重命名、搜索、显隐、透明度和范围定位。
+- 编辑 GeoJSON 后实时更新地图。
+- 点击地图要素查看属性和完整 GeoJSON。
+- 项目自动保存到浏览器 IndexedDB。
+- 导入/导出 `.gear-map.json` 项目文件，单独导出当前 GeoJSON。
+- 瓦片网格和鼠标坐标辅助调试。
+
+项目使用 Bun 管理和构建。
 
 ```shell
 # 安装依赖
@@ -13,6 +25,8 @@ bun run dev
 # 构建项目
 bun run build
 ```
+
+`/home` 和 `/geojson` 会重定向到统一工作台 `/`。
 
 环境变量说明：
 

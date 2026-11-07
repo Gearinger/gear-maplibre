@@ -13,20 +13,16 @@
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
     "@codemirror/lang-json": "^6.0.2",
-    "@mapbox/mapbox-gl-draw": "^1.5.2",
-    "@mapbox/vector-tile": "^3.0.0",
     "@maplibre/maplibre-gl-geocoder": "^1.9.4",
     "@turf/turf": "^7.4.0",
     "ant-design-vue": "^4.2.6",
     "flatgeobuf": "^4.6.1",
     "maplibre-gl": "^6.16.0",
-    "pbf": "^5.1.2",
     "vue": "^3.5.45",
     "vue-codemirror": "^6.1.1",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@types/mapbox__mapbox-gl-draw": "^1.4.9",
     "@vitejs/plugin-vue": "^6.0.10",
     "less": "^4.9.1",
     "typescript": "^5.9.3",
