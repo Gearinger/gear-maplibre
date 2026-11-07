@@ -1,25 +1,18 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { router } from './router';
+import { ConfigProvider, theme } from 'ant-design-vue';
 
-// This starter template is using Vue 3 <script setup> SFCs
-// Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
-
-onMounted(() => {
-  // This will redirect to the GeojsonMap view when the app is mounted
-  // router.push('/home');
-});
-
+const antTheme = {
+  algorithm: theme.darkAlgorithm,
+};
 </script>
 
 <template>
-  <RouterView></RouterView>
+  <ConfigProvider :theme="antTheme">
+    <RouterView></RouterView>
+  </ConfigProvider>
 </template>
 
 <style lang="less">
-@import 'ant-design-vue/dist/antd.dark.css';
-
-
 body {
   margin: 0;
   padding: 0;

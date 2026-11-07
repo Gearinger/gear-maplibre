@@ -12,6 +12,10 @@ import { DrawHandlers, MapMouseMoveHandlers, type DrawEvent } from "../common/Ma
 import { addDrawControl, addGeocoderController, addNavigationControl } from "../common/MapController";
 
 let map: Map | undefined;
+type DrawEventMap = {
+  on(type: "draw.create", listener: (event: DrawEvent) => void): unknown;
+  off(type: "draw.create", listener: (event: DrawEvent) => void): unknown;
+};
 
 const onMouseMove = (event: MapMouseEvent) => {
   MapMouseMoveHandlers.forEach((handler) => handler(event));
@@ -37,13 +41,13 @@ onMounted(() => {
   }
 
   map.on("mousemove", onMouseMove);
-  map.on("draw.create", onDrawCreate as (event: unknown) => void);
+  (map as unknown as DrawEventMap).on("draw.create", onDrawCreate);
 });
 
 onBeforeUnmount(() => {
   if (!map) return;
   map.off("mousemove", onMouseMove);
-  map.off("draw.create", onDrawCreate as (event: unknown) => void);
+  (map as unknown as DrawEventMap).off("draw.create", onDrawCreate);
   destroyMap();
   map = undefined;
 });

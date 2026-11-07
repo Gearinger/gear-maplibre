@@ -2,7 +2,7 @@
 import type { Map } from "maplibre-gl";
 import { ref } from "vue";
 import { VectorTile } from '@mapbox/vector-tile';
-import Pbf from "pbf";
+import { PbfReader } from "pbf";
 
 interface Props {
     map: Map;
@@ -74,7 +74,7 @@ const addTileLayer = () => {
                 })
                 .then(data => {
 
-                    const pbf = new Pbf(data);
+                    const pbf = new PbfReader(data);
                     const vectorTile = new VectorTile(pbf);
                     const layerName = Object.keys(vectorTile.layers)[0];
                     if (!layerName) throw new Error('PBF 瓦片中没有可用图层');

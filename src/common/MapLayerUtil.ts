@@ -17,16 +17,8 @@ export async function addFlatGeoBuf(fgb: string | Uint8Array | ReadableStream) {
     const fc: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
     let i = 0;
 
-    if (typeof fgb === "string") {
-        for await (const f of geojson.deserialize(fgb)) {
-            fc.features.push({ ...f, id: i++ });
-        }
-    } else if (fgb instanceof ReadableStream) {
-        for await (const f of geojson.deserialize(fgb)) {
-            fc.features.push({ ...f, id: i++ });
-        }
-    } else {
-        fc.features.push(...geojson.deserialize(fgb).features);
+    for await (const f of geojson.deserialize(fgb)) {
+        fc.features.push({ ...f, id: i++ });
     }
 
     map.addSource("counties", {

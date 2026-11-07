@@ -7,7 +7,6 @@ import {
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 import { map } from "../common/MapUtil";
-import { ColumnProps } from "ant-design-vue/lib/table/Column";
 import FileSelect from "./FileSelect.vue";
 import {
   addGeoJson,
@@ -16,7 +15,7 @@ import {
   type ManagedLayer,
 } from "../common/MapLayerUtil";
 
-type Key = ColumnProps["key"];
+type Key = string | number;
 
 interface Layer {
   key: Key;
@@ -243,7 +242,7 @@ function helpHandle() {
           </a-col>
           <a-col :span="4">
             <a-button block @click="importVisible = true">+</a-button>
-            <a-modal v-model:visible="importVisible" @ok="importfinish">
+            <a-modal v-model:open="importVisible" @ok="importfinish">
               <a-tabs size="small" v-model:activeKey="activeTab">
                 <a-tab-pane key="1" tab="file">
                   <FileSelect @load-file="loadFile"></FileSelect>

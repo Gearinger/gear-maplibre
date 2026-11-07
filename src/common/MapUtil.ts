@@ -1,6 +1,6 @@
-import { center, Point } from '@turf/turf'
+import { center } from '@turf/turf'
 import { Map, Marker, LngLat } from "maplibre-gl"
-import maplibregl from "maplibre-gl"
+import type { MapGeoJSONFeature } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css";
 import '@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css';
 
@@ -36,8 +36,8 @@ export function initMap(containerId: string): Map {
  * @param map 地图
  * @returns 
  */
-export function drawAnno(feature: maplibregl.MapGeoJSONFeature): maplibregl.Marker {
-    let pos = center(feature.toJSON()).geometry as Point;
+export function drawAnno(feature: MapGeoJSONFeature): Marker {
+    let pos = center(feature.toJSON()).geometry as GeoJSON.Point;
 
     let htmlEle = document.createElement("div");
     htmlEle.textContent = pos.coordinates[0] + "," + pos.coordinates[1];

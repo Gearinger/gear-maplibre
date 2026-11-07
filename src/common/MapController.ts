@@ -1,4 +1,5 @@
-import maplibregl, { NavigationControl, Map, IControl } from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import { NavigationControl, Map, IControl } from "maplibre-gl";
 import { map } from "./MapUtil";
 import MaplibreGeocoder, { MaplibreGeocoderApi, MaplibreGeocoderFeatureResults } from "@maplibre/maplibre-gl-geocoder";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
