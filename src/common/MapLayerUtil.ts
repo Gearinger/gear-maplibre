@@ -2,7 +2,7 @@ import { geojson } from "flatgeobuf";
 import { bbox } from "@turf/turf";
 import type { GeoJSONSource } from "maplibre-gl";
 import { map } from "./MapUtil";
-import type { LayerBounds, ManagedLayer } from "../types/workspace";
+import type { LayerBounds, ManagedLayer, WorkspaceLayer } from "../types/workspace";
 
 function getFeatureCount(data: GeoJSON.GeoJSON) {
     return "features" in data ? data.features.length : 1;
@@ -266,6 +266,40 @@ export function setManagedLayerOpacity(layer: ManagedLayer, opacity: number) {
                 map.setPaintProperty(layerId, "icon-opacity", value);
                 map.setPaintProperty(layerId, "text-opacity", value);
                 break;
+        }
+    }
+}
+
+export function applyManagedLayerStyle(layer: WorkspaceLayer) {
+    for (const layerId of layer.styleLayerIds) {
+        const styleLayer = map.getLayer(layerId);
+        if (!styleLayer) continue;
+
+        switch (styleLayer.type) {
+            case "fill":
+                map.setPaintProperty(layerId, "fill-color", layer.style.color);
+                map.setPaintProperty(layerId, "fill-outline-color", layer.style.color);
+                break;
+            case "line":
+                map.setPaintProperty(layerId, "line-color", layer.style.color);
+                map.setPaintProperty(layerId, "line-width", layer.style.lineWidth);
+                break;
+            case "circle":
+                map.setPaintProperty(layerId, "circle-color", layer.style.color);
+                map.setPaintProperty(layerId, "circle-radius", layer.style.pointRadius);
+                break;
+            case "symbol":
+                map.setPaintProperty(layerId, "text-color", layer.style.color);
+                break;
+        }
+    }
+}
+
+export function applyManagedLayerOrder(orderedLayers: WorkspaceLayer[]) {
+    // Workspace order is top-to-bottom; MapLibre draws later layers above earlier ones.
+    for (const layer of [...orderedLayers].reverse()) {
+        for (const layerId of layer.styleLayerIds) {
+            if (map.getLayer(layerId)) map.moveLayer(layerId);
         }
     }
 }

@@ -41,6 +41,9 @@
               <p>选择 GeoJSON 图层后，可在这里查看和修改数据。</p>
             </div>
           </a-tab-pane>
+          <a-tab-pane key="style" tab="样式">
+            <LayerStyleEditor />
+          </a-tab-pane>
           <a-tab-pane key="feature" tab="要素">
             <FeatureInspector @focus="focusSelectedFeature" />
           </a-tab-pane>
@@ -60,11 +63,14 @@ import TopMenu from "../components/TopMenu.vue";
 import LayerManager from "../components/LayerManager.vue";
 import TextContent from "../components/TextContent.vue";
 import FeatureInspector from "../components/FeatureInspector.vue";
+import LayerStyleEditor from "../components/LayerStyleEditor.vue";
 import { map } from "../common/MapUtil";
 import {
   addGeoJson,
   addPbfLayer,
   addTileLayer,
+  applyManagedLayerOrder,
+  applyManagedLayerStyle,
   removeManagedLayer,
   setManagedLayerOpacity,
   setManagedLayerVisibility,
@@ -200,7 +206,8 @@ async function loadSample() {
     if (!response.ok) throw new Error(`请求失败：${response.status}`);
     const data = await response.json() as GeoJSON.GeoJSON;
     const sourceName = `sample-${Date.now()}`;
-    workspace.addLayer(await addGeoJson(sourceName, data), "示例 GeoJSON");
+    const layer = workspace.addLayer(await addGeoJson(sourceName, data), "示例 GeoJSON");
+    applyManagedLayerStyle(layer);
     message.success("示例数据加载成功");
   } catch (error) {
     message.error(`示例数据加载失败：${error instanceof Error ? error.message : String(error)}`);
@@ -315,7 +322,9 @@ async function restoreWorkspace(snapshot: WorkspaceSnapshot) {
   for (const layer of restored) {
     setManagedLayerVisibility(layer, layer.visible);
     setManagedLayerOpacity(layer, layer.opacity);
+    applyManagedLayerStyle(layer);
   }
+  applyManagedLayerOrder(restored);
 }
 
 async function initializeWorkspace() {

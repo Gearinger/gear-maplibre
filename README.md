@@ -3,7 +3,8 @@
 主要功能：
 
 - 导入本地 GeoJSON、URL 数据、XYZ 瓦片、矢量瓦片和 Martin Catalog。
-- 图层重命名、搜索、显隐、透明度和范围定位。
+- 图层重命名、搜索、排序、显隐、透明度和范围定位。
+- GeoJSON 颜色、线宽和点半径样式编辑。
 - 编辑 GeoJSON 后实时更新地图。
 - 点击地图要素查看属性和完整 GeoJSON。
 - 项目自动保存到浏览器 IndexedDB。
@@ -24,6 +25,9 @@ bun run dev
 
 # 构建项目
 bun run build
+
+# 运行单元测试
+bun test
 ```
 
 `/home` 和 `/geojson` 会重定向到统一工作台 `/`。

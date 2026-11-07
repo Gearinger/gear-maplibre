@@ -8,6 +8,8 @@ import {
   EyeInvisibleOutlined,
   AimOutlined,
   PlusOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 import { map } from "../common/MapUtil";
@@ -16,6 +18,8 @@ import {
   addGeoJson,
   addPbfLayer,
   addTileLayer,
+  applyManagedLayerOrder,
+  applyManagedLayerStyle,
   fitManagedLayer,
   removeManagedLayer,
   setManagedLayerOpacity,
@@ -90,7 +94,7 @@ const layerFields = [
   },
   {
     title: "操作",
-    width: 65,
+    width: 100,
     align: "center",
     dataIndex: "operation",
     slots: { customRender: "operation" },
@@ -114,11 +118,18 @@ function getUniqueLayerName(baseName: string) {
   return candidate;
 }
 
+function registerLayer(managed: Awaited<ReturnType<typeof addGeoJson>>, name: string) {
+  const layer = workspace.addLayer(managed, name);
+  applyManagedLayerStyle(layer);
+  applyManagedLayerOrder(layers.value);
+  return layer;
+}
+
 async function loadFile(fileName: string, content: string) {
   try {
     const json = JSON.parse(content) as GeoJSON.GeoJSON;
     const sourceName = getUniqueLayerName(fileName.replace(/\.[^.]+$/, ""));
-    workspace.addLayer(await addGeoJson(sourceName, json), fileName.replace(/\.[^.]+$/, ""));
+    registerLayer(await addGeoJson(sourceName, json), fileName.replace(/\.[^.]+$/, ""));
     importVisible.value = false;
     message.success(`${fileName} 加载成功`);
   } catch (error) {
@@ -150,7 +161,7 @@ async function importMartinCatalog(catalogUrl: string) {
     if (layerMap[layerName].content_type !== "application/x-protobuf") continue;
     const uniqueName = getUniqueLayerName(layerName);
     const tileUrl = catalogUrl.replace(/catalog\/?$/, uniqueName);
-    workspace.addLayer(await addPbfLayer(uniqueName, tileUrl), layerName);
+    registerLayer(await addPbfLayer(uniqueName, tileUrl), layerName);
     loaded++;
   }
 
@@ -180,12 +191,12 @@ async function importfinish() {
         if (!layer) {
           throw new Error(`暂不支持图层类型：${urlModel.type}`);
         }
-        workspace.addLayer(layer, urlModel.layerName || layer.id);
+        registerLayer(layer, urlModel.layerName || layer.id);
       }
     } else if (activeTab.value === "3") {
       const json = JSON.parse(textModel.content) as GeoJSON.GeoJSON;
       const layerName = getUniqueLayerName(`geojson-${Date.now()}`);
-      workspace.addLayer(await addGeoJson(layerName, json), "粘贴的 GeoJSON");
+      registerLayer(await addGeoJson(layerName, json), "粘贴的 GeoJSON");
     }
 
     importVisible.value = false;
@@ -200,7 +211,7 @@ async function loadSample() {
     const response = await fetch(`${import.meta.env.BASE_URL}data/smallGeoJSON.geojson`);
     if (!response.ok) throw new Error(`请求失败：${response.status}`);
     const data = await response.json() as GeoJSON.GeoJSON;
-    workspace.addLayer(
+    registerLayer(
       await addGeoJson(getUniqueLayerName("示例数据"), data),
       "示例数据"
     );
@@ -237,6 +248,12 @@ function focusLayer(layer: WorkspaceLayer) {
   setActiveLayer(layer);
   if (!fitManagedLayer(layer)) {
     message.info("该图层没有可用的范围信息");
+  }
+}
+
+function moveLayer(layer: WorkspaceLayer, offset: -1 | 1) {
+  if (workspace.moveLayer(layer.key, offset)) {
+    applyManagedLayerOrder(layers.value);
   }
 }
 
@@ -333,7 +350,7 @@ function helpHandle() {
         </a-row>
       </div>
       <a-table :dataSource="filteredLayerList" :columns="layerFields" size="small" tableLayout="fixed"
-        :pagination="false" :customRow="rowProps" :scroll="{ x: 380 }">
+        :pagination="false" :customRow="rowProps" :scroll="{ x: 420 }">
         <template #name="{ record }">
           <div class="layer-name-cell" @dblclick.stop="startRename(record)">
             <button class="visibility-button" :title="record.visible ? '隐藏图层' : '显示图层'"
@@ -351,6 +368,12 @@ function helpHandle() {
             @click.stop @input="changeOpacity($event, record)">
         </template>
         <template #operation="{ record }">
+          <a-button title="上移图层" size="small" type="text" @click.stop="moveLayer(record, -1)">
+            <template #icon><ArrowUpOutlined /></template>
+          </a-button>
+          <a-button title="下移图层" size="small" type="text" @click.stop="moveLayer(record, 1)">
+            <template #icon><ArrowDownOutlined /></template>
+          </a-button>
           <a-button title="定位图层" size="small" type="text" @click.stop="focusLayer(record)">
             <template #icon><AimOutlined /></template>
           </a-button>

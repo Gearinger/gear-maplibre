@@ -2,6 +2,12 @@ export type WorkspaceLayerType = "GeoJSON" | "XYZ-Tile" | "Vector Tile" | "FlatG
 
 export type LayerBounds = [number, number, number, number];
 
+export interface LayerStyle {
+  color: string;
+  lineWidth: number;
+  pointRadius: number;
+}
+
 export interface ManagedLayer {
   id: string;
   type: WorkspaceLayerType | string;
@@ -18,6 +24,7 @@ export interface WorkspaceLayer extends ManagedLayer {
   name: string;
   visible: boolean;
   opacity: number;
+  style: LayerStyle;
 }
 
 export interface InspectedFeature {

@@ -6,8 +6,9 @@
   "packageManager": "bun@1.2.4",
   "scripts": {
     "dev": "vite",
+    "test": "bun test",
     "typecheck": "vue-tsc --noEmit",
-    "build": "bun run typecheck && vite build",
+    "build": "bun test && bun run typecheck && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.4",
     "@vitejs/plugin-vue": "^6.0.10",
     "less": "^4.9.1",
     "typescript": "^5.9.3",
