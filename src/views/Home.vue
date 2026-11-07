@@ -83,8 +83,10 @@ import {
   appendGeoJsonFeatures,
   findGeoJsonFeatureIndex,
   getGeoJsonFeature,
+  parseGeoJsonText,
   replaceGeoJsonFeature,
 } from "../common/GeoJsonUtil";
+import { parseGeoJsonAsync } from "../common/GeoJsonParser";
 import { createSnapshotHistory } from "../common/SnapshotHistory";
 import {
   addGeoJson,
@@ -134,6 +136,8 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let persistenceReady = false;
 let mapEventsReady = false;
 let applyingHistory = false;
+let pointerFrame: number | undefined;
+let lastPointerPoint: MapLayerMouseEvent["point"] | undefined;
 
 const history = createSnapshotHistory<WorkspaceSnapshot>(
   (snapshot) => JSON.stringify({ ...snapshot, savedAt: "" }),
@@ -292,7 +296,7 @@ async function loadSample() {
   try {
     const response = await fetch(`${import.meta.env.BASE_URL}data/smallGeoJSON.geojson`);
     if (!response.ok) throw new Error(`请求失败：${response.status}`);
-    const data = await response.json() as GeoJSON.GeoJSON;
+    const data = await parseGeoJsonAsync(await response.text());
     const sourceName = `sample-${Date.now()}`;
     const layer = workspace.addLayer(await addGeoJson(sourceName, data), "示例 GeoJSON");
     applyManagedLayerStyle(layer);
@@ -310,7 +314,7 @@ function applyEditorContent(value: string) {
     const layer = layers.value.find((item) => item.key === layerKey);
     if (!layer || layer.key !== activeLayer.value?.key) return;
     try {
-      updateManagedGeoJson(layer, JSON.parse(value) as GeoJSON.GeoJSON);
+      updateManagedGeoJson(layer, parseGeoJsonText(value));
     } catch (error) {
       message.warning(`GeoJSON 尚未保存：${error instanceof Error ? error.message : String(error)}`);
     }
@@ -489,9 +493,15 @@ function onMapClick(event: MapLayerMouseEvent) {
 }
 
 function onPointerMove(event: MapLayerMouseEvent) {
-  const hasLayer = queryWorkspaceFeatures(event.point)
-    .some((feature) => Boolean(findLayerForFeature(feature.layer.id)));
-  map.getCanvas().style.cursor = hasLayer ? "pointer" : "";
+  lastPointerPoint = event.point;
+  if (pointerFrame !== undefined) return;
+  pointerFrame = requestAnimationFrame(() => {
+    pointerFrame = undefined;
+    if (!lastPointerPoint) return;
+    const hasLayer = queryWorkspaceFeatures(lastPointerPoint)
+      .some((feature) => Boolean(findLayerForFeature(feature.layer.id)));
+    map.getCanvas().style.cursor = hasLayer ? "pointer" : "";
+  });
 }
 
 function focusSelectedFeature() {
@@ -570,7 +580,46 @@ async function initializeWorkspace() {
   persistenceReady = true;
 }
 
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.matches("input, textarea, select")
+    || target.isContentEditable
+    || Boolean(target.closest(".cm-editor"));
+}
+
+function onKeyDown(event: KeyboardEvent) {
+  const modifier = event.ctrlKey || event.metaKey;
+  const key = event.key.toLowerCase();
+
+  if (modifier && key === "z" && !isEditableTarget(event.target)) {
+    event.preventDefault();
+    if (event.shiftKey) void redo();
+    else void undo();
+    return;
+  }
+  if (modifier && key === "y" && !isEditableTarget(event.target)) {
+    event.preventDefault();
+    void redo();
+    return;
+  }
+  if (modifier && key === "s") {
+    event.preventDefault();
+    exportProject();
+    return;
+  }
+  if (modifier && key === "o") {
+    event.preventDefault();
+    chooseProjectFile();
+    return;
+  }
+  if (event.key === "Escape") {
+    stopDrawing();
+    selectedFeature.value = undefined;
+  }
+}
+
 onMounted(() => {
+  window.addEventListener("keydown", onKeyDown);
   const setup = () => {
     void initializeWorkspace();
   };
@@ -583,8 +632,10 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeyDown);
   clearTimeout(editorTimer);
   clearTimeout(saveTimer);
+  if (pointerFrame !== undefined) cancelAnimationFrame(pointerFrame);
   if (mapEventsReady) {
     map.off("click", onMapClick);
     map.off("mousemove", onPointerMove);

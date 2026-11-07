@@ -9,6 +9,7 @@
 - 在地图上绘制点、线和面到当前 GeoJSON 图层。
 - 点击地图要素查看、编辑属性并拖动节点修改几何。
 - 支持工作区级别的撤销和重做。
+- 超过 512 KB 的 GeoJSON 在 Web Worker 中解析，避免阻塞地图交互。
 - 项目自动保存到浏览器 IndexedDB。
 - 导入/导出 `.gear-map.json` 项目文件，单独导出当前 GeoJSON。
 - 瓦片网格和鼠标坐标辅助调试。
@@ -33,6 +34,14 @@ bun test
 ```
 
 `/home` 和 `/geojson` 会重定向到统一工作台 `/`。
+
+快捷键：
+
+- `Ctrl/Cmd + Z`：撤销
+- `Ctrl/Cmd + Shift + Z` 或 `Ctrl/Cmd + Y`：重做
+- `Ctrl/Cmd + S`：导出项目
+- `Ctrl/Cmd + O`：打开项目
+- `Esc`：结束绘制或清空要素选择
 
 环境变量说明：
 

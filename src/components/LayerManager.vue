@@ -25,6 +25,7 @@ import {
   setManagedLayerOpacity,
   setManagedLayerVisibility,
 } from "../common/MapLayerUtil";
+import { parseGeoJsonAsync } from "../common/GeoJsonParser";
 import { useWorkspace } from "../stores/workspace";
 import type { WorkspaceLayer } from "../types/workspace";
 
@@ -127,7 +128,7 @@ function registerLayer(managed: Awaited<ReturnType<typeof addGeoJson>>, name: st
 
 async function loadFile(fileName: string, content: string) {
   try {
-    const json = JSON.parse(content) as GeoJSON.GeoJSON;
+    const json = await parseGeoJsonAsync(content);
     const sourceName = getUniqueLayerName(fileName.replace(/\.[^.]+$/, ""));
     registerLayer(await addGeoJson(sourceName, json), fileName.replace(/\.[^.]+$/, ""));
     importVisible.value = false;
@@ -194,7 +195,7 @@ async function importfinish() {
         registerLayer(layer, urlModel.layerName || layer.id);
       }
     } else if (activeTab.value === "3") {
-      const json = JSON.parse(textModel.content) as GeoJSON.GeoJSON;
+      const json = await parseGeoJsonAsync(textModel.content);
       const layerName = getUniqueLayerName(`geojson-${Date.now()}`);
       registerLayer(await addGeoJson(layerName, json), "粘贴的 GeoJSON");
     }
@@ -210,7 +211,7 @@ async function loadSample() {
   try {
     const response = await fetch(`${import.meta.env.BASE_URL}data/smallGeoJSON.geojson`);
     if (!response.ok) throw new Error(`请求失败：${response.status}`);
-    const data = await response.json() as GeoJSON.GeoJSON;
+    const data = await parseGeoJsonAsync(await response.text());
     registerLayer(
       await addGeoJson(getUniqueLayerName("示例数据"), data),
       "示例数据"

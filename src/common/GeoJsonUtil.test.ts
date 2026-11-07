@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   appendGeoJsonFeatures,
   findGeoJsonFeatureIndex,
+  parseGeoJsonText,
   replaceGeoJsonFeature,
   updateGeoJsonFeatureProperties,
 } from "./GeoJsonUtil";
@@ -85,5 +86,15 @@ describe("GeoJSON utilities", () => {
 
     expect(result.data.bbox).toEqual([0, 0, 1, 1]);
     expect(result.data.features[0].geometry).toEqual(replacement.geometry);
+  });
+
+  test("validates GeoJSON before importing", () => {
+    expect(parseGeoJsonText(JSON.stringify(pointFeature)).type).toBe("Feature");
+    expect(() => parseGeoJsonText('{"type":"Unknown"}')).toThrow(
+      "不支持的 GeoJSON 类型"
+    );
+    expect(() => parseGeoJsonText('{"type":"FeatureCollection"}')).toThrow(
+      "缺少 features"
+    );
   });
 });

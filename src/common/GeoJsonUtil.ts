@@ -27,6 +27,25 @@ export function appendGeoJsonFeatures(
   };
 }
 
+export function parseGeoJsonText(text: string): GeoJSON.GeoJSON {
+  const data = JSON.parse(text) as unknown;
+  if (!data || typeof data !== "object" || !("type" in data)) {
+    throw new Error("内容不是有效的 GeoJSON");
+  }
+
+  const type = (data as { type?: unknown }).type;
+  if (!["FeatureCollection", "Feature", "Point", "MultiPoint", "LineString", "MultiLineString", "Polygon", "MultiPolygon", "GeometryCollection"].includes(String(type))) {
+    throw new Error(`不支持的 GeoJSON 类型：${String(type)}`);
+  }
+  if (type === "FeatureCollection" && !Array.isArray((data as { features?: unknown }).features)) {
+    throw new Error("FeatureCollection 缺少 features 数组");
+  }
+  if (type === "Feature" && !("geometry" in data)) {
+    throw new Error("Feature 缺少 geometry");
+  }
+  return data as GeoJSON.GeoJSON;
+}
+
 export function findGeoJsonFeatureIndex(
   data: GeoJSON.GeoJSON | undefined,
   featureId?: string | number
