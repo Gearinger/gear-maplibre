@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { AimOutlined, EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons-vue";
+import { computed } from "vue";
 import {
   applyManagedLayerStyle,
   fitManagedLayer,
@@ -9,6 +10,10 @@ import {
 import { useWorkspace } from "../stores/workspace";
 
 const { activeLayer } = useWorkspace();
+const supportsGeoJsonStyle = computed(() =>
+  Boolean(activeLayer.value?.data)
+  && (activeLayer.value?.type === "GeoJSON" || activeLayer.value?.type === "FlatGeobuf")
+);
 
 function setColor(event: Event) {
   if (!activeLayer.value) return;
@@ -82,7 +87,7 @@ function focusLayer() {
           :value="activeLayer.opacity * 100" @input="setOpacity">
       </div>
 
-      <template v-if="activeLayer.type === 'GeoJSON'">
+      <template v-if="supportsGeoJsonStyle">
         <div class="style-section">
           <label class="field-label">
             <span>主色</span>

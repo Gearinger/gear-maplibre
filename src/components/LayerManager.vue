@@ -14,7 +14,9 @@ import {
 import { message } from "ant-design-vue";
 import { map } from "../common/MapUtil";
 import FileSelect from "./FileSelect.vue";
+import BinaryFileSelect from "./BinaryFileSelect.vue";
 import {
+  addFlatGeoBuf,
   addGeoJson,
   addGeoTiffLayer,
   addModelLayer,
@@ -155,6 +157,21 @@ async function loadFile(fileName: string, content: string) {
   }
 }
 
+async function loadFlatGeoBuf(fileName: string, content: ArrayBuffer) {
+  try {
+    const displayName = fileName.replace(/\.[^.]+$/, "");
+    const sourceName = getUniqueLayerName(displayName);
+    const layer = registerLayer(
+      await addFlatGeoBuf(new Uint8Array(content), sourceName),
+      displayName
+    );
+    importVisible.value = false;
+    message.success(`${fileName} 加载成功，共 ${layer.featureCount ?? 0} 个要素`);
+  } catch (error) {
+    message.error(`FlatGeobuf 解析或加载失败：${getErrorMessage(error)}`);
+  }
+}
+
 async function deleteLayer(layer: WorkspaceLayer) {
   try {
     removeManagedLayer(layer);
@@ -194,6 +211,8 @@ async function createUrlLayer(layerName: string): Promise<Awaited<ReturnType<typ
       return addPbfLayer(layerName, urlModel.url);
     case "GeoJSON":
       return addGeoJson(layerName, urlModel.url);
+    case "FlatGeobuf":
+      return addFlatGeoBuf(urlModel.url, layerName);
     case "PMTiles":
       return addPmtilesLayer(layerName, urlModel.url);
     case "GeoTIFF":
@@ -338,7 +357,7 @@ function githubHandle() {
 }
 
 function helpHandle() {
-  message.info("支持 GeoJSON、XYZ 瓦片、矢量瓦片和 Martin Catalog。");
+  message.info("支持 GeoJSON、FlatGeobuf、PMTiles、GeoTIFF、地形、3D Tiles、模型和瓦片服务。");
 }
 </script>
 
@@ -378,12 +397,14 @@ function helpHandle() {
               <a-tabs size="small" v-model:activeKey="activeTab">
                 <a-tab-pane key="1" tab="file">
                   <FileSelect @load-file="loadFile"></FileSelect>
+                  <BinaryFileSelect class="flatgeobuf-select" @load-file="loadFlatGeoBuf" />
                 </a-tab-pane>
                 <a-tab-pane key="2" tab="url" force-render>
                   <a-form :model="urlModel" :label-col="{ span: 5 }" style="margin: 20px">
                     <a-form-item label="type">
                       <a-select v-model:value="urlModel.type" size="small">
                         <a-select-option value="GeoJSON">GeoJSON</a-select-option>
+                        <a-select-option value="FlatGeobuf">FlatGeobuf</a-select-option>
                         <a-select-option value="Tile">XYZ-Tile</a-select-option>
                         <a-select-option value="Vector Tile">Vector Tile</a-select-option>
                         <a-select-option value="PMTiles">PMTiles</a-select-option>
@@ -634,6 +655,10 @@ function helpHandle() {
   margin-top: 6px;
   color: rgba(255, 255, 255, 0.62);
   font-size: 11px;
+}
+
+.flatgeobuf-select {
+  margin-top: 12px;
 }
 
 .field-hint {

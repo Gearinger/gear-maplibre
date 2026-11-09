@@ -19,7 +19,7 @@
 
       <main class="map-pane">
         <Map />
-        <div v-if="activeLayer?.type === 'GeoJSON' && activeLayer.data" class="draw-toolbar">
+        <div v-if="isGeoJsonBacked(activeLayer)" class="draw-toolbar">
           <span class="draw-toolbar-label">绘制</span>
           <button :class="{ active: drawMode === 'draw_point' }" @click="startDrawing('draw_point')">点</button>
           <button :class="{ active: drawMode === 'draw_line_string' }"
@@ -45,7 +45,7 @@
       <aside class="editor-panel">
         <a-tabs v-model:activeKey="rightPanelTab" class="editor-tabs">
           <a-tab-pane key="json" tab="数据">
-            <TextContent v-if="activeLayer?.type === 'GeoJSON'" v-model="editorContent"
+            <TextContent v-if="isGeoJsonBacked(activeLayer)" v-model="editorContent"
               @update:model-value="applyEditorContent" />
             <div v-else class="editor-empty">
               <strong>当前图层没有 JSON 数据</strong>
@@ -90,6 +90,7 @@ import { parseGeoJsonAsync } from "../common/GeoJsonParser";
 import { createSnapshotHistory } from "../common/SnapshotHistory";
 import {
   addGeoJson,
+  addFlatGeoBuf,
   addGeoTiffLayer,
   addModelLayer,
   addPbfLayer,
@@ -159,7 +160,7 @@ type DrawEventMap = {
 };
 
 const canExportGeoJson = computed(() =>
-  activeLayer.value?.type === "GeoJSON" && Boolean(activeLayer.value.data)
+  isGeoJsonBacked(activeLayer.value) && Boolean(activeLayer.value?.data)
 );
 const canUndo = computed(() => history.canUndo.value && !applyingHistory);
 const canRedo = computed(() => history.canRedo.value && !applyingHistory);
@@ -167,7 +168,7 @@ const canRedo = computed(() => history.canRedo.value && !applyingHistory);
 watch(activeLayer, (layer) => {
   editorSync = true;
   editorContent.value =
-    layer?.type === "GeoJSON" && layer.data
+    isGeoJsonBacked(layer) && layer?.data
       ? JSON.stringify(layer.data, null, 2)
       : "";
   queueMicrotask(() => {
@@ -211,6 +212,12 @@ function downloadJson(fileName: string, value: unknown) {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function isGeoJsonBacked(
+  layer: WorkspaceLayer | undefined
+): layer is WorkspaceLayer & { data: GeoJSON.GeoJSON } {
+  return Boolean(layer?.data) && (layer?.type === "GeoJSON" || layer?.type === "FlatGeobuf");
 }
 
 function cloneSnapshot(snapshot: WorkspaceSnapshot) {
@@ -312,7 +319,7 @@ async function loadSample() {
 }
 
 function applyEditorContent(value: string) {
-  if (editorSync || activeLayer.value?.type !== "GeoJSON") return;
+  if (editorSync || !isGeoJsonBacked(activeLayer.value)) return;
   clearTimeout(editorTimer);
   const layerKey = activeLayer.value.key;
   editorTimer = setTimeout(() => {
@@ -328,7 +335,7 @@ function applyEditorContent(value: string) {
 
 function startDrawing(mode: DrawMode) {
   const layer = activeLayer.value;
-  if (!draw || !layer?.data || layer.type !== "GeoJSON") {
+  if (!draw || !isGeoJsonBacked(layer)) {
     message.warning("请先选择一个包含数据的 GeoJSON 图层");
     return;
   }
@@ -348,7 +355,7 @@ function stopDrawing() {
 
 function onDrawCreated(event: DrawCreatedEvent) {
   const layer = activeLayer.value;
-  if (!layer?.data || layer.type !== "GeoJSON") {
+  if (!isGeoJsonBacked(layer)) {
     message.warning("当前没有可编辑的 GeoJSON 图层");
     return stopDrawing();
   }
@@ -535,6 +542,13 @@ async function restoreWorkspace(snapshot: WorkspaceSnapshot) {
       let managed;
       if (saved.type === "XYZ-Tile" && saved.url) {
         managed = await addTileLayer(saved.id, saved.url);
+      } else if (saved.type === "FlatGeobuf" && saved.url) {
+        managed = await addFlatGeoBuf(saved.url, saved.id);
+      } else if (saved.type === "FlatGeobuf" && saved.data) {
+        managed = {
+          ...await addGeoJson(saved.id, saved.data),
+          type: "FlatGeobuf",
+        };
       } else if (saved.type === "PMTiles" && saved.url) {
         managed = await addPmtilesLayer(saved.id, saved.url);
       } else if (saved.type === "GeoTIFF" && saved.url) {

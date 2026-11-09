@@ -32,7 +32,9 @@ const featureJson = computed(() =>
 );
 const canEdit = computed(() =>
   selectedFeature.value?.featureIndex !== undefined
-  && layers.value.find((layer) => layer.key === selectedFeature.value?.layerKey)?.type === "GeoJSON"
+  && ["GeoJSON", "FlatGeobuf"].includes(
+    layers.value.find((layer) => layer.key === selectedFeature.value?.layerKey)?.type ?? ""
+  )
 );
 
 watch(

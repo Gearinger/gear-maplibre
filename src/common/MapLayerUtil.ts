@@ -45,32 +45,11 @@ export async function addFlatGeoBuf(
         fc.features.push({ ...f, id: i++ });
     }
 
-    map.addSource(sourceName, {
-        type: "geojson",
-        data: fc,
-    });
-    map.addLayer({
-        id: `${sourceName}-fill`,
-        type: "fill",
-        source: sourceName,
-        paint: {
-            "fill-color": "#0000FF",
-            "fill-opacity": [
-                "case",
-                ["boolean", ["feature-state", "hover"], false],
-                1,
-                0.5,
-            ],
-        },
-    });
+    const managed = await addGeoJson(sourceName, fc);
     return {
-        id: sourceName,
+        ...managed,
         type: "FlatGeobuf",
-        source: sourceName,
-        styleLayerIds: [`${sourceName}-fill`],
-        data: fc,
-        featureCount: fc.features.length,
-        bounds: getBounds(fc),
+        url: typeof fgb === "string" ? fgb : undefined,
     };
 }
 
