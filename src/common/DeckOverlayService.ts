@@ -71,6 +71,16 @@ export async function add3DTilesDeckLayer(
     data: url,
     loader: Tiles3DLoader,
     pickable: false,
+    onTilesetLoad: (tileset) => {
+      const center = tileset.cartographicCenter;
+      if (!center) return;
+      mapInstance.flyTo({
+        center: [center[0], center[1]],
+        zoom: Math.min(tileset.zoom, 18),
+        pitch: 45,
+        duration: 1200,
+      });
+    },
     onTileError: (_tile, tileUrl, message) => {
       console.error(`3D Tiles tile failed: ${tileUrl}`, message);
     },
