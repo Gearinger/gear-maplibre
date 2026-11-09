@@ -1,80 +1,62 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref } from "vue";
 
 const props = withDefaults(defineProps<{
-    exts?: string[]
-}>(),
-    {
-        exts: () => ['json', 'geojson']
-    }
-);
+  exts?: string[];
+}>(), {
+  exts: () => ["json", "geojson", "fgb", "glb", "gltf"],
+});
 
 const emit = defineEmits<{
-    (e: 'load-file', fileName: string, content: string): void;
+  (event: "load-files", files: File[]): void;
 }>();
 
-const fileAreaActive = ref(false);
-const fileInput = ref<HTMLInputElement>();
+const input = ref<HTMLInputElement>();
+const active = ref(false);
 
-function getExtension(fileName: string) {
-    return fileName.split('.').pop()?.toLowerCase() ?? '';
+function extension(fileName: string) {
+  return fileName.split(".").pop()?.toLowerCase() ?? "";
 }
 
-async function loadFiles(files: File[]) {
-    for (const file of files) {
-        const fileName = file.name;
-        const ext = getExtension(fileName);
-        if (!props.exts.includes(ext)) {
-            alert(`Unsupported file: ${fileName}`);
-            continue;
-        }
-        try {
-            emit("load-file", fileName, await file.text());
-        } catch (error) {
-            alert(`读取文件失败：${fileName}`);
-            console.error(error);
-        }
-    }
+function acceptFiles(files: File[]) {
+  const accepted = files.filter((file) => props.exts.includes(extension(file.name)));
+  const rejected = files.filter((file) => !props.exts.includes(extension(file.name)));
+  if (rejected.length > 0) {
+    alert(`Unsupported file(s): ${rejected.map((file) => file.name).join(", ")}`);
+  }
+  if (accepted.length > 0) emit("load-files", accepted);
 }
 
-function openFilePicker() {
-    fileInput.value?.click();
+function openPicker() {
+  input.value?.click();
 }
 
-async function inputLoadFileHandle(event: Event) {
-    const input = event.target as HTMLInputElement;
-    if (input.files) await loadFiles(Array.from(input.files));
-    input.value = '';
+function onInput(event: Event) {
+  const element = event.target as HTMLInputElement;
+  if (element.files) acceptFiles(Array.from(element.files));
+  element.value = "";
 }
 
-async function dragLoadFileHandle(event: DragEvent) {
-    fileAreaActive.value = false;
-    if (event.dataTransfer?.files) {
-        await loadFiles(Array.from(event.dataTransfer.files));
-    }
+function onDrop(event: DragEvent) {
+  active.value = false;
+  if (event.dataTransfer?.files) {
+    acceptFiles(Array.from(event.dataTransfer.files));
+  }
 }
 </script>
 
 <template>
-    <div :class="{
-        'file-import-area': true,
-        active: fileAreaActive,
-    }" @drop.prevent="dragLoadFileHandle" @dragleave.prevent="fileAreaActive = false"
-        @dragover.prevent="fileAreaActive = true" @dragenter.prevent="fileAreaActive = true"
-        @click="openFilePicker">
-        <input ref="fileInput" class="file-input" type="file" :accept="props.exts.map(ext => '.' + ext).join(',')"
-            multiple hidden @click.stop @change="inputLoadFileHandle">
-        <p class="file-import-area-icon">
-            <inbox-outlined></inbox-outlined>
-        </p>
-        <p class="file-import-area-text">
-            Click or drag file to this area to load
-        </p>
-        <p class="file-import-area-hint">
-            Support for one or more files. Coordinate system
-            must be 'EPSG:4326'
-            <br />
-            *.json | *.geojson
-        </p>
-    </div>
+  <div class="file-import-area" :class="{ active }" @click="openPicker"
+    @dragover.prevent="active = true" @dragenter.prevent="active = true"
+    @dragleave.prevent="active = false" @drop.prevent="onDrop">
+    <input ref="input" type="file" :accept="exts.map(ext => '.' + ext).join(',')" hidden
+      multiple @click.stop @change="onInput">
+    <p class="file-import-area-icon">＋</p>
+    <p class="file-import-area-text">点击或拖入文件</p>
+    <p class="file-import-area-hint">
+      自动识别格式：GeoJSON、FlatGeobuf、glTF / GLB
+      <br />
+      {{ exts.map(ext => '*.' + ext).join(' · ') }}
+    </p>
+  </div>
 </template>

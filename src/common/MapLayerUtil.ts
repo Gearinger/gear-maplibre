@@ -10,6 +10,7 @@ import {
     reorderDeckLayers,
     setDeckLayerOpacity,
     setDeckLayerVisibility,
+    updateModelDeckLayer,
 } from "./DeckOverlayService";
 import {
     cogUrl,
@@ -536,4 +537,21 @@ export async function addModelLayer(
         modelScale: scale,
         engine: "deck",
     };
+}
+
+export async function updateManagedModel(layer: WorkspaceLayer) {
+    if (
+        layer.type !== "Model"
+        || !layer.url
+        || !layer.coordinates
+    ) {
+        throw new Error("当前图层不是可更新的模型");
+    }
+    await updateModelDeckLayer(
+        map,
+        layer.id,
+        layer.url,
+        layer.coordinates,
+        layer.modelScale ?? 1
+    );
 }

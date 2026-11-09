@@ -3,6 +3,7 @@
 主要功能：
 
 - 导入本地或 URL FlatGeobuf、GeoJSON、XYZ 瓦片、矢量瓦片和 Martin Catalog。
+- 单一本地文件入口自动识别 GeoJSON、FlatGeobuf、glTF 和 GLB。
 - 通过 URL 预览 PMTiles、Cloud Optimized GeoTIFF、地形 DEM 和 3D Tiles。
 - 预览本地 glTF/GLB 模型，或将模型放置在指定经纬度和高度。
 - 图层重命名、搜索、排序、显隐、透明度和范围定位。
@@ -53,6 +54,7 @@ bun test
 - 地形支持普通 Terrain RGB/Terrarium 服务和 COG DEM。
 - 3D Tiles 与 glTF/GLB 使用 deck.gl 叠加层，并在首次使用时动态加载。
 - 本地 glTF 建议使用内嵌资源的 `.glb`；引用外部纹理的 `.gltf` 建议使用完整 URL。
+- 本地模型默认放在当前地图中心，可在样式面板中修改经纬度、高度和缩放。
 
 环境变量说明：
 

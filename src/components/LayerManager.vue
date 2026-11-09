@@ -14,7 +14,6 @@ import {
 import { message } from "ant-design-vue";
 import { map } from "../common/MapUtil";
 import FileSelect from "./FileSelect.vue";
-import BinaryFileSelect from "./BinaryFileSelect.vue";
 import {
   addFlatGeoBuf,
   addGeoJson,
@@ -69,8 +68,6 @@ const urlModel = reactive({
   altitude: 0,
   scale: 1,
 });
-const modelFileUrl = ref("");
-const modelFileName = ref("");
 
 const filteredLayerList = computed(() => {
   const query = searchLayerContent.value.trim().toLowerCase();
@@ -145,30 +142,54 @@ function registerLayer(managed: Awaited<ReturnType<typeof addGeoJson>>, name: st
   return layer;
 }
 
-async function loadFile(fileName: string, content: string) {
+async function loadLocalFiles(files: File[]) {
+  importing.value = true;
+  let loaded = 0;
+  const failures: string[] = [];
   try {
-    const json = await parseGeoJsonAsync(content);
-    const sourceName = getUniqueLayerName(fileName.replace(/\.[^.]+$/, ""));
-    registerLayer(await addGeoJson(sourceName, json), fileName.replace(/\.[^.]+$/, ""));
-    importVisible.value = false;
-    message.success(`${fileName} 加载成功`);
-  } catch (error) {
-    message.error(`文件解析或加载失败：${getErrorMessage(error)}`);
+    for (const file of files) {
+      const displayName = file.name.replace(/\.[^.]+$/, "");
+      const sourceName = getUniqueLayerName(displayName);
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      try {
+        if (ext === "json" || ext === "geojson") {
+          const data = await parseGeoJsonAsync(await file.text());
+          registerLayer(await addGeoJson(sourceName, data), displayName);
+        } else if (ext === "fgb") {
+          registerLayer(
+            await addFlatGeoBuf(new Uint8Array(await file.arrayBuffer()), sourceName),
+            displayName
+          );
+        } else if (ext === "glb" || ext === "gltf") {
+          const modelUrl = await readFileAsDataUrl(file);
+          const center = map.getCenter();
+          registerLayer(
+            await addModelLayer(
+              sourceName,
+              modelUrl,
+              [center.lng, center.lat, 0],
+              1
+            ),
+            displayName
+          );
+        } else {
+          throw new Error(`暂不支持文件格式：.${ext}`);
+        }
+        loaded++;
+      } catch (error) {
+        failures.push(`${file.name}: ${getErrorMessage(error)}`);
+      }
+    }
+  } finally {
+    importing.value = false;
   }
-}
 
-async function loadFlatGeoBuf(fileName: string, content: ArrayBuffer) {
-  try {
-    const displayName = fileName.replace(/\.[^.]+$/, "");
-    const sourceName = getUniqueLayerName(displayName);
-    const layer = registerLayer(
-      await addFlatGeoBuf(new Uint8Array(content), sourceName),
-      displayName
-    );
+  if (loaded > 0) {
     importVisible.value = false;
-    message.success(`${fileName} 加载成功，共 ${layer.featureCount ?? 0} 个要素`);
-  } catch (error) {
-    message.error(`FlatGeobuf 解析或加载失败：${getErrorMessage(error)}`);
+    message.success(`已加载 ${loaded} 个文件`);
+  }
+  if (failures.length > 0) {
+    message.error(failures.join("；"));
   }
 }
 
@@ -222,8 +243,8 @@ async function createUrlLayer(layerName: string): Promise<Awaited<ReturnType<typ
     case "3D Tiles":
       return add3DTilesLayer(layerName, urlModel.url);
     case "Model": {
-      const modelUrl = modelFileUrl.value || urlModel.url;
-      if (!modelUrl) throw new Error("请选择模型文件或填写模型 URL");
+      const modelUrl = urlModel.url;
+      if (!modelUrl) throw new Error("请填写模型 URL");
       return addModelLayer(
         layerName,
         modelUrl,
@@ -243,20 +264,6 @@ function readFileAsDataUrl(file: File) {
     reader.onerror = () => reject(reader.error ?? new Error("模型文件读取失败"));
     reader.readAsDataURL(file);
   });
-}
-
-async function modelFileChanged(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-  try {
-    modelFileUrl.value = await readFileAsDataUrl(file);
-    modelFileName.value = file.name;
-    urlModel.layerName = file.name.replace(/\.[^.]+$/, "");
-    message.success(`已选择模型：${file.name}`);
-  } catch (error) {
-    message.error(`模型读取失败：${getErrorMessage(error)}`);
-  }
 }
 
 async function importfinish() {
@@ -378,8 +385,7 @@ function helpHandle() {
             <a-modal v-model:open="importVisible" :confirm-loading="importing" @ok="importfinish">
               <a-tabs size="small" v-model:activeKey="activeTab">
                 <a-tab-pane key="1" tab="file">
-                  <FileSelect @load-file="loadFile"></FileSelect>
-                  <BinaryFileSelect class="flatgeobuf-select" @load-file="loadFlatGeoBuf" />
+                  <FileSelect @load-files="loadLocalFiles" />
                 </a-tab-pane>
                 <a-tab-pane key="2" tab="url" force-render>
                   <a-form :model="urlModel" :label-col="{ span: 5 }" style="margin: 20px">
@@ -409,7 +415,7 @@ function helpHandle() {
                         TIFF 地址会自动按 COG DEM 读取
                       </div>
                       <div v-if="urlModel.type === 'Model'" class="field-hint">
-                        本地 .glb 最稳定；引用外部纹理的 .gltf 请使用完整 URL
+                        URL 必须可直接访问模型及 .gltf 引用的外部资源
                       </div>
                     </a-form-item>
                     <a-form-item v-if="urlModel.type === 'Terrain'" label="encoding">
@@ -419,15 +425,6 @@ function helpHandle() {
                       </a-select>
                     </a-form-item>
                     <template v-if="urlModel.type === 'Model'">
-                      <a-form-item label="模型文件">
-                        <input type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
-                          @change="modelFileChanged">
-                        <div v-if="modelFileName" class="selected-file">
-                          {{ modelFileName }}
-                          <a-button size="small" type="link"
-                            @click="modelFileUrl = ''; modelFileName = ''">清除</a-button>
-                        </div>
-                      </a-form-item>
                       <a-row :gutter="8">
                         <a-col :span="8">
                           <a-form-item label="经度">
@@ -631,16 +628,6 @@ function helpHandle() {
 .file-import-area-hint {
   font-size: 9px;
   opacity: 0.5;
-}
-
-.selected-file {
-  margin-top: 6px;
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 11px;
-}
-
-.flatgeobuf-select {
-  margin-top: 12px;
 }
 
 .field-hint {

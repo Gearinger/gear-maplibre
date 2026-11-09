@@ -6,7 +6,9 @@ import {
   fitManagedLayer,
   setManagedLayerOpacity,
   setManagedLayerVisibility,
+  updateManagedModel,
 } from "../common/MapLayerUtil";
+import { map } from "../common/MapUtil";
 import { useWorkspace } from "../stores/workspace";
 
 const { activeLayer } = useWorkspace();
@@ -47,6 +49,29 @@ function toggleVisibility() {
 
 function focusLayer() {
   if (activeLayer.value) fitManagedLayer(activeLayer.value);
+}
+
+function updateModelCoordinate(index: 0 | 1 | 2, value: number | null) {
+  if (!activeLayer.value?.coordinates) return;
+  activeLayer.value.coordinates[index] = Number(value ?? 0);
+  void updateManagedModel(activeLayer.value);
+}
+
+function updateModelScale(value: number | null) {
+  if (!activeLayer.value) return;
+  activeLayer.value.modelScale = Math.max(0.0001, Number(value ?? 1));
+  void updateManagedModel(activeLayer.value);
+}
+
+function moveModelToMapCenter() {
+  if (!activeLayer.value?.coordinates) return;
+  const center = map.getCenter();
+  activeLayer.value.coordinates = [
+    center.lng,
+    center.lat,
+    activeLayer.value.coordinates[2] ?? 0,
+  ];
+  void updateManagedModel(activeLayer.value);
 }
 </script>
 
@@ -113,6 +138,32 @@ function focusLayer() {
           </label>
           <input class="range-input" type="range" min="2" max="20" step="1"
             :value="activeLayer.style.pointRadius" @input="setPointRadius">
+        </div>
+      </template>
+
+      <template v-if="activeLayer.type === 'Model' && activeLayer.coordinates">
+        <div class="style-section">
+          <label class="field-label"><span>模型位置</span></label>
+          <div class="coordinate-grid">
+            <a-input-number :value="activeLayer.coordinates[0]" :step="0.0001"
+              @change="updateModelCoordinate(0, $event)" />
+            <a-input-number :value="activeLayer.coordinates[1]" :step="0.0001"
+              @change="updateModelCoordinate(1, $event)" />
+            <a-input-number :value="activeLayer.coordinates[2]" :step="1"
+              @change="updateModelCoordinate(2, $event)" />
+          </div>
+          <a-button block class="center-model-button" @click="moveModelToMapCenter">
+            移动到当前地图中心
+          </a-button>
+        </div>
+
+        <div class="style-section">
+          <label class="field-label">
+            <span>模型缩放</span>
+            <strong>{{ activeLayer.modelScale ?? 1 }}</strong>
+          </label>
+          <a-input-number :value="activeLayer.modelScale ?? 1" :min="0.0001" :step="0.1"
+            @change="updateModelScale" />
         </div>
       </template>
 
@@ -202,6 +253,20 @@ function focusLayer() {
   border-radius: 6px;
   background: transparent;
   cursor: pointer;
+}
+
+.coordinate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.coordinate-grid :deep(.ant-input-number) {
+  width: 100%;
+}
+
+.center-model-button {
+  margin-top: 10px;
 }
 
 .data-summary {

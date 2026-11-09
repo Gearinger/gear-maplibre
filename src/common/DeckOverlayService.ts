@@ -87,7 +87,25 @@ export async function addModelDeckLayer(
   scale = 1
 ) {
   const { ScenegraphLayer } = await ensureOverlay(mapInstance);
-  const layer = new ScenegraphLayer({
+  const layer = createModelLayer(
+    ScenegraphLayer,
+    id,
+    url,
+    coordinates,
+    scale
+  );
+  records.set(id, { id, layer, visible: true, opacity: 1 });
+  syncLayers();
+}
+
+function createModelLayer(
+  ScenegraphLayer: DeckModules["ScenegraphLayer"],
+  id: string,
+  url: string,
+  coordinates: [number, number, number],
+  scale: number
+) {
+  return new ScenegraphLayer({
     id,
     data: [{ position: coordinates }],
     scenegraph: url,
@@ -98,8 +116,21 @@ export async function addModelDeckLayer(
     _lighting: "pbr",
     pickable: false,
   });
-  records.set(id, { id, layer, visible: true, opacity: 1 });
+}
+
+export async function updateModelDeckLayer(
+  mapInstance: MapLibreMap,
+  id: string,
+  url: string,
+  coordinates: [number, number, number],
+  scale: number
+) {
+  const record = records.get(id);
+  if (!record) return false;
+  const { ScenegraphLayer } = await ensureOverlay(mapInstance);
+  record.layer = createModelLayer(ScenegraphLayer, id, url, coordinates, scale);
   syncLayers();
+  return true;
 }
 
 export function setDeckLayerVisibility(id: string, visible: boolean) {
