@@ -47,11 +47,8 @@
           <button v-if="drawMode" @click="stopDrawing">结束</button>
         </div>
         <div v-if="layers.length === 0" class="map-empty-state">
-          <div class="empty-card">
-            <div class="empty-kicker">GEAR MAP</div>
-            <h1>当前项目还没有图层</h1>
-            <p>使用左侧的导入按钮添加本地数据、URL、瓦片、地形或三维资源。</p>
-          </div>
+          <span>当前项目还没有图层，你仍然可以浏览地图</span>
+          <button @click="leftPanelOpen = true">打开图层</button>
         </div>
       </main>
 
@@ -813,43 +810,35 @@ onBeforeUnmount(() => {
 
 .map-empty-state {
   position: absolute;
-  inset: 0;
-  z-index: 5;
-  display: grid;
-  place-items: center;
-  padding: 30px;
-  pointer-events: none;
-  background: radial-gradient(circle at center, rgba(14, 24, 32, 0.15), rgba(14, 24, 32, 0.6));
-}
-
-.empty-card {
-  max-width: 520px;
-  padding: 30px;
-  color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(94, 234, 212, 0.35);
-  border-radius: 16px;
-  background: rgba(17, 24, 39, 0.88);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
-  text-align: center;
-  pointer-events: auto;
-  backdrop-filter: blur(12px);
-}
-
-.empty-kicker {
-  color: #5eead4;
+  z-index: 6;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 32px);
+  padding: 7px 8px 7px 12px;
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.9);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.24);
   font-size: 11px;
-  letter-spacing: 0.18em;
+  white-space: nowrap;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
 }
 
-.empty-card h1 {
-  margin: 10px 0 8px;
-  font-size: clamp(24px, 4vw, 34px);
-}
-
-.empty-card p {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.62);
-  line-height: 1.7;
+.map-empty-state button {
+  padding: 4px 9px;
+  color: #0f1720;
+  border: 0;
+  border-radius: 999px;
+  background: #5eead4;
+  font-size: 11px;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .onboarding p {
@@ -893,19 +882,6 @@ onBeforeUnmount(() => {
   color: rgba(255, 255, 255, 0.94);
   font-size: 16px;
   font-weight: 600;
-}
-
-.empty-actions {
-  margin-top: 22px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-}
-
-.empty-actions span {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 11px;
 }
 
 .editor-tabs {
@@ -988,12 +964,10 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .empty-card {
-    padding: 22px;
-  }
-
-  .empty-actions {
-    flex-direction: column;
+  .map-empty-state {
+    width: calc(100% - 24px);
+    justify-content: space-between;
+    white-space: normal;
   }
 }
 </style>
