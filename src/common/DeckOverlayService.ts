@@ -74,7 +74,13 @@ export async function add3DTilesDeckLayer(
     const layer = new Tile3DLayer({
       id,
       data: url,
-      loader: Tiles3DLoader,
+      loaders: [Tiles3DLoader],
+      loadOptions: {
+        "3d-tiles": {
+          loadGLTF: true,
+          decodeQuantizedPositions: true,
+        },
+      },
       pickable: false,
       onTilesetLoad: (tileset) => {
         clearTimeout(timeout);
