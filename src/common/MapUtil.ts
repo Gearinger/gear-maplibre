@@ -1,10 +1,11 @@
 import { center } from '@turf/turf'
-import { Map, Marker, LngLat } from "maplibre-gl"
+import { Map, Marker, LngLat, setWorkerUrl } from "maplibre-gl"
 import type { MapGeoJSONFeature } from "maplibre-gl"
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url"
 import "maplibre-gl/dist/maplibre-gl.css";
 import '@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css';
 
-
+setWorkerUrl(maplibreWorkerUrl)
 
 export var map: Map;
 
