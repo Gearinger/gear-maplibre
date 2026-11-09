@@ -337,7 +337,7 @@ export function fitManagedLayer(layer: ManagedLayer) {
     if (layer.coordinates) {
         map.flyTo({
             center: [layer.coordinates[0], layer.coordinates[1]],
-            zoom: Math.max(map.getZoom(), 15),
+            zoom: layer.focusZoom ?? Math.max(map.getZoom(), 15),
             pitch: 50,
         });
         return true;
@@ -523,7 +523,7 @@ export async function add3DTilesLayer(
     layerName: string,
     tilesetUrl: string
 ): Promise<ManagedLayer> {
-    await add3DTilesDeckLayer(map, layerName, tilesetUrl);
+    const info = await add3DTilesDeckLayer(map, layerName, tilesetUrl);
     return {
         id: layerName,
         type: "3D Tiles",
@@ -531,6 +531,8 @@ export async function add3DTilesLayer(
         styleLayerIds: [],
         url: tilesetUrl,
         engine: "deck",
+        coordinates: info?.coordinates,
+        focusZoom: info?.zoom,
     };
 }
 

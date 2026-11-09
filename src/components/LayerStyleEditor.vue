@@ -96,7 +96,8 @@ function moveModelToMapCenter() {
               <EyeInvisibleOutlined v-else />
             </template>
           </a-button>
-          <a-button size="small" title="定位图层" :disabled="!activeLayer.bounds"
+          <a-button size="small" title="定位图层"
+            :disabled="!activeLayer.bounds && !activeLayer.coordinates"
             @click="focusLayer">
             <template #icon><AimOutlined /></template>
           </a-button>

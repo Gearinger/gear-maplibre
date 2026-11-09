@@ -66,27 +66,42 @@ export async function add3DTilesDeckLayer(
   url: string
 ) {
   const { Tile3DLayer, Tiles3DLoader } = await ensureOverlay(mapInstance);
-  const layer = new Tile3DLayer({
-    id,
-    data: url,
-    loader: Tiles3DLoader,
-    pickable: false,
-    onTilesetLoad: (tileset) => {
-      const center = tileset.cartographicCenter;
-      if (!center) return;
-      mapInstance.flyTo({
-        center: [center[0], center[1]],
-        zoom: Math.min(tileset.zoom, 18),
-        pitch: 45,
-        duration: 1200,
-      });
-    },
-    onTileError: (_tile, tileUrl, message) => {
-      console.error(`3D Tiles tile failed: ${tileUrl}`, message);
-    },
+  return new Promise<{
+    coordinates: [number, number, number];
+    zoom: number;
+  } | undefined>((resolve) => {
+    const timeout = setTimeout(() => resolve(undefined), 15_000);
+    const layer = new Tile3DLayer({
+      id,
+      data: url,
+      loader: Tiles3DLoader,
+      pickable: false,
+      onTilesetLoad: (tileset) => {
+        clearTimeout(timeout);
+        const center = tileset.cartographicCenter;
+        if (!center) {
+          resolve(undefined);
+          return;
+        }
+        const zoom = Math.min(tileset.zoom, 18);
+        mapInstance.flyTo({
+          center: [center[0], center[1]],
+          zoom,
+          pitch: 45,
+          duration: 1200,
+        });
+        resolve({
+          coordinates: [center[0], center[1], center[2] ?? 0],
+          zoom,
+        });
+      },
+      onTileError: (_tile, tileUrl, message) => {
+        console.error(`3D Tiles tile failed: ${tileUrl}`, message);
+      },
+    });
+    records.set(id, { id, layer, visible: true, opacity: 1 });
+    syncLayers();
   });
-  records.set(id, { id, layer, visible: true, opacity: 1 });
-  syncLayers();
 }
 
 export async function addModelDeckLayer(

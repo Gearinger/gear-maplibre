@@ -28,6 +28,7 @@ export interface ManagedLayer {
   bounds?: LayerBounds;
   engine?: "maplibre" | "deck";
   coordinates?: [number, number, number];
+  focusZoom?: number;
   modelScale?: number;
   terrainEncoding?: "mapbox" | "terrarium";
 }
