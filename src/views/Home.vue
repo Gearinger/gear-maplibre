@@ -79,7 +79,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { bbox } from "@turf/turf";
 import { message } from "ant-design-vue";
-import type { IControl, MapLayerMouseEvent } from "maplibre-gl";
+import type { IControl, MapGeoJSONFeature, MapLayerMouseEvent } from "maplibre-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import Map from "../components/Map.vue";
@@ -155,6 +155,8 @@ let mapEventsReady = false;
 let applyingHistory = false;
 let pointerFrame: number | undefined;
 let lastPointerPoint: MapLayerMouseEvent["point"] | undefined;
+let hoveredFeatureState: FeatureStateTarget | undefined;
+let selectedFeatureState: FeatureStateTarget | undefined;
 
 const history = createSnapshotHistory<WorkspaceSnapshot>(
   (snapshot) => JSON.stringify({ ...snapshot, savedAt: "" }),
@@ -163,6 +165,7 @@ const history = createSnapshotHistory<WorkspaceSnapshot>(
 
 type DrawMode = "draw_point" | "draw_line_string" | "draw_polygon";
 type DrawCreatedEvent = { features: GeoJSON.Feature[] };
+type FeatureStateTarget = { source: string; id: string | number };
 type DrawEventMap = {
   on(type: "draw.create", listener: (event: DrawCreatedEvent) => void): unknown;
   off(type: "draw.create", listener: (event: DrawCreatedEvent) => void): unknown;
@@ -189,6 +192,21 @@ watch(activeLayer, (layer) => {
 
 watch(activeLayerKey, () => {
   stopDrawing();
+});
+
+watch(selectedFeature, (next, previous) => {
+  if (previous) {
+    updateFeatureState(
+      { source: previous.source, id: previous.id },
+      { selected: false }
+    );
+  }
+  if (next) {
+    updateFeatureState(
+      { source: next.source, id: next.id },
+      { selected: true }
+    );
+  }
 });
 
 watch(
@@ -531,16 +549,72 @@ function onMapClick(event: MapLayerMouseEvent) {
   rightPanelOpen.value = true;
 }
 
+function updateFeatureState(
+  target: { source?: string; id?: string | number },
+  state: Record<string, boolean>
+) {
+  if (!target.source || target.id === undefined) return;
+  try {
+    map.setFeatureState(
+      { source: target.source, id: target.id },
+      state
+    );
+  } catch (error) {
+    console.warn("Unable to update feature state:", error);
+  }
+}
+
+function setHoveredFeature(feature?: MapGeoJSONFeature) {
+  const target = feature
+    ? { source: feature.source, id: feature.id }
+    : undefined;
+  const nextKey = target?.id === undefined
+    ? undefined
+    : `${target.source}:${target.id}`;
+  const currentKey = hoveredFeatureState?.id === undefined
+    ? undefined
+    : `${hoveredFeatureState.source}:${hoveredFeatureState.id}`;
+  if (nextKey === currentKey) return;
+
+  if (hoveredFeatureState) {
+    updateFeatureState(hoveredFeatureState, { hover: false });
+  }
+  hoveredFeatureState = target?.id === undefined
+    ? undefined
+    : target as FeatureStateTarget;
+  if (hoveredFeatureState) {
+    updateFeatureState(hoveredFeatureState, { hover: true });
+  }
+}
+
+function clearHoveredFeature() {
+  if (hoveredFeatureState) {
+    updateFeatureState(hoveredFeatureState, { hover: false });
+  }
+  hoveredFeatureState = undefined;
+  map.getCanvas().style.cursor = "";
+}
+
 function onPointerMove(event: MapLayerMouseEvent) {
   lastPointerPoint = event.point;
   if (pointerFrame !== undefined) return;
   pointerFrame = requestAnimationFrame(() => {
     pointerFrame = undefined;
     if (!lastPointerPoint) return;
-    const hasLayer = queryWorkspaceFeatures(lastPointerPoint)
-      .some((feature) => Boolean(findLayerForFeature(feature.layer.id)));
-    map.getCanvas().style.cursor = hasLayer ? "pointer" : "";
+    const hit = queryWorkspaceFeatures(lastPointerPoint)
+      .find((feature) => Boolean(findLayerForFeature(feature.layer.id)));
+    map.getCanvas().style.cursor = hit ? "pointer" : "";
+    setHoveredFeature(hit);
   });
+}
+
+function onMapMouseOut() {
+  if (pointerFrame !== undefined) {
+    cancelAnimationFrame(pointerFrame);
+    pointerFrame = undefined;
+  }
+  lastPointerPoint = undefined;
+  clearHoveredFeature();
 }
 
 function focusSelectedFeature() {
@@ -558,6 +632,7 @@ function registerMapEvents() {
   if (mapEventsReady) return;
   map.on("click", onMapClick);
   map.on("mousemove", onPointerMove);
+  map.on("mouseout", onMapMouseOut);
   setupDrawing();
   mapEventsReady = true;
 }
@@ -706,6 +781,7 @@ onBeforeUnmount(() => {
   if (mapEventsReady) {
     map.off("click", onMapClick);
     map.off("mousemove", onPointerMove);
+    map.off("mouseout", onMapMouseOut);
   }
   if (draw) {
     (map as unknown as DrawEventMap).off("draw.create", onDrawCreated);

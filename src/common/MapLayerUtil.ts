@@ -18,6 +18,7 @@ import {
     getCogBounds,
     openPmtilesArchive,
 } from "./SpatialProtocols";
+import { featureStateColor, featureStateNumber } from "./MapStyleUtil";
 
 function getFeatureCount(data: GeoJSON.GeoJSON) {
     return "features" in data ? data.features.length : 1;
@@ -79,9 +80,9 @@ export async function addGeoJson(
             source: sourceName,
             filter: ["match", ["geometry-type"], ["Polygon", "MultiPolygon"], true, false],
             paint: {
-                "fill-color": "#088",
+                "fill-color": featureStateColor("#38bdf8"),
                 "fill-opacity": 0.8,
-                "fill-outline-color": "red",
+                "fill-outline-color": featureStateColor("#38bdf8"),
             },
         });
         map.addLayer({
@@ -90,8 +91,8 @@ export async function addGeoJson(
             source: sourceName,
             filter: ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
             paint: {
-                "line-color": "#ff6b35",
-                "line-width": 2,
+                "line-color": featureStateColor("#38bdf8"),
+                "line-width": featureStateNumber(1.5, 3, 4.5),
             },
         });
         map.addLayer({
@@ -100,8 +101,8 @@ export async function addGeoJson(
             source: sourceName,
             filter: ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false],
             paint: {
-                "circle-color": "#ff6b35",
-                "circle-radius": 5,
+                "circle-color": featureStateColor("#38bdf8"),
+                "circle-radius": featureStateNumber(5, 7, 9),
             },
         });
 
@@ -114,6 +115,11 @@ export async function addGeoJson(
                     "text-field": `{${annoField}}`,
                     "text-size": 11,
                     "text-offset": [0, 0.8],
+                },
+                paint: {
+                    "text-color": featureStateColor("#38bdf8"),
+                    "text-halo-color": "#0f1720",
+                    "text-halo-width": 1,
                 },
             });
         }
@@ -287,19 +293,27 @@ export function applyManagedLayerStyle(layer: WorkspaceLayer) {
 
         switch (styleLayer.type) {
             case "fill":
-                map.setPaintProperty(layerId, "fill-color", layer.style.color);
-                map.setPaintProperty(layerId, "fill-outline-color", layer.style.color);
+                map.setPaintProperty(layerId, "fill-color", featureStateColor(layer.style.color));
+                map.setPaintProperty(layerId, "fill-outline-color", featureStateColor(layer.style.color));
                 break;
             case "line":
-                map.setPaintProperty(layerId, "line-color", layer.style.color);
-                map.setPaintProperty(layerId, "line-width", layer.style.lineWidth);
+                map.setPaintProperty(layerId, "line-color", featureStateColor(layer.style.color));
+                map.setPaintProperty(
+                    layerId,
+                    "line-width",
+                    featureStateNumber(layer.style.lineWidth, layer.style.lineWidth + 1.5, layer.style.lineWidth + 3)
+                );
                 break;
             case "circle":
-                map.setPaintProperty(layerId, "circle-color", layer.style.color);
-                map.setPaintProperty(layerId, "circle-radius", layer.style.pointRadius);
+                map.setPaintProperty(layerId, "circle-color", featureStateColor(layer.style.color));
+                map.setPaintProperty(
+                    layerId,
+                    "circle-radius",
+                    featureStateNumber(layer.style.pointRadius, layer.style.pointRadius + 2, layer.style.pointRadius + 4)
+                );
                 break;
             case "symbol":
-                map.setPaintProperty(layerId, "text-color", layer.style.color);
+                map.setPaintProperty(layerId, "text-color", featureStateColor(layer.style.color));
                 break;
         }
     }
@@ -393,9 +407,9 @@ export async function addPmtilesLayer(
             url: protocolUrl,
         });
         for (const [suffix, type, paint] of [
-            ["fill", "fill", { "fill-color": "#38bdf8", "fill-opacity": 0.45, "fill-outline-color": "#38bdf8" }],
-            ["line", "line", { "line-color": "#38bdf8", "line-width": 1.5 }],
-            ["point", "circle", { "circle-color": "#38bdf8", "circle-radius": 4 }],
+            ["fill", "fill", { "fill-color": featureStateColor("#38bdf8"), "fill-opacity": 0.45, "fill-outline-color": featureStateColor("#38bdf8") }],
+            ["line", "line", { "line-color": featureStateColor("#38bdf8"), "line-width": featureStateNumber(1.5, 3, 4.5) }],
+            ["point", "circle", { "circle-color": featureStateColor("#38bdf8"), "circle-radius": featureStateNumber(4, 6, 8) }],
         ] as const) {
             const id = `${layerName}-${suffix}`;
             map.addLayer({
