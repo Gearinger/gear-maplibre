@@ -3,11 +3,28 @@
     <TopMenu :layers-open="leftPanelOpen" :editor-open="rightPanelOpen"
       :can-export-geo-json="canExportGeoJson" :can-undo="canUndo" :can-redo="canRedo"
       @toggle-layers="leftPanelOpen = !leftPanelOpen"
-      @toggle-editor="rightPanelOpen = !rightPanelOpen" @load-sample="loadSample"
+      @toggle-editor="rightPanelOpen = !rightPanelOpen"
       @export-geojson="exportActiveGeoJson" @export-project="exportProject"
       @import-project="chooseProjectFile" @undo="undo" @redo="redo" />
     <input ref="projectInput" type="file" accept=".json,application/json" hidden
       @change="importProjectFile">
+
+    <a-modal v-model:open="showOnboarding" title="开始使用 Gear Map"
+      :closable="false" :keyboard="false" :mask-closable="false" :footer="null" width="600px">
+      <div class="onboarding">
+        <p>选择如何开始当前项目。这个选择只会在首次进入时出现。</p>
+        <div class="onboarding-options">
+          <button class="onboarding-option" @click="startBlankWorkspace">
+            <span class="onboarding-option-title">从空白开始</span>
+            <span>自己导入 GeoJSON、FlatGeobuf、瓦片或三维数据。</span>
+          </button>
+          <button class="onboarding-option accent" @click="startWithSample">
+            <span class="onboarding-option-title">填充示例数据</span>
+            <span>加载一份示例 GeoJSON，立即体验图层和要素编辑。</span>
+          </button>
+        </div>
+      </div>
+    </a-modal>
 
     <div class="workspace-main" :class="{
       'layers-collapsed': !leftPanelOpen,
@@ -32,12 +49,8 @@
         <div v-if="layers.length === 0" class="map-empty-state">
           <div class="empty-card">
             <div class="empty-kicker">GEAR MAP</div>
-            <h1>从一份 GeoJSON 开始</h1>
-            <p>拖入本地文件、打开数据 URL，或先加载示例数据体验图层和要素检查。</p>
-            <div class="empty-actions">
-              <a-button type="primary" size="large" @click="loadSample">加载示例数据</a-button>
-              <span>也可以使用左侧的导入按钮</span>
-            </div>
+            <h1>当前项目还没有图层</h1>
+            <p>使用左侧的导入按钮添加本地数据、URL、瓦片、地形或三维资源。</p>
           </div>
         </div>
       </main>
@@ -130,6 +143,7 @@ const {
 
 const editorContent = ref("");
 const projectInput = ref<HTMLInputElement>();
+const showOnboarding = ref(false);
 const drawMode = ref<DrawMode | null>(null);
 const geometryEditing = ref(false);
 let draw: MapboxDraw | undefined;
@@ -313,9 +327,25 @@ async function loadSample() {
     const layer = workspace.addLayer(await addGeoJson(sourceName, data), "示例 GeoJSON");
     applyManagedLayerStyle(layer);
     message.success("示例数据加载成功");
+    return true;
   } catch (error) {
     message.error(`示例数据加载失败：${error instanceof Error ? error.message : String(error)}`);
+    return false;
   }
+}
+
+async function startBlankWorkspace() {
+  showOnboarding.value = false;
+  history.reset(cloneSnapshot(workspace.snapshot()));
+  await saveWorkspaceSnapshot(workspace.snapshot());
+}
+
+async function startWithSample() {
+  const loaded = await loadSample();
+  if (!loaded) return;
+  showOnboarding.value = false;
+  history.reset(cloneSnapshot(workspace.snapshot()));
+  await saveWorkspaceSnapshot(workspace.snapshot());
 }
 
 function applyEditorContent(value: string) {
@@ -612,6 +642,8 @@ async function initializeWorkspace() {
 
   if (snapshot) {
     await restoreWorkspace(snapshot);
+  } else {
+    showOnboarding.value = true;
   }
 
   history.reset(cloneSnapshot(workspace.snapshot()));
@@ -820,6 +852,49 @@ onBeforeUnmount(() => {
   line-height: 1.7;
 }
 
+.onboarding p {
+  margin: 0 0 18px;
+  color: rgba(255, 255, 255, 0.62);
+  line-height: 1.7;
+}
+
+.onboarding-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.onboarding-option {
+  min-height: 128px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.onboarding-option:hover {
+  transform: translateY(-2px);
+  border-color: rgba(94, 234, 212, 0.55);
+  background: rgba(94, 234, 212, 0.07);
+}
+
+.onboarding-option.accent {
+  border-color: rgba(94, 234, 212, 0.44);
+}
+
+.onboarding-option-title {
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 16px;
+  font-weight: 600;
+}
+
 .empty-actions {
   margin-top: 22px;
   display: flex;
@@ -909,6 +984,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 600px) {
+  .onboarding-options {
+    grid-template-columns: 1fr;
+  }
+
   .empty-card {
     padding: 22px;
   }

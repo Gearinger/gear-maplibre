@@ -290,21 +290,6 @@ async function importfinish() {
   }
 }
 
-async function loadSample() {
-  try {
-    const response = await fetch(`${import.meta.env.BASE_URL}data/smallGeoJSON.geojson`);
-    if (!response.ok) throw new Error(`请求失败：${response.status}`);
-    const data = await parseGeoJsonAsync(await response.text());
-    registerLayer(
-      await addGeoJson(getUniqueLayerName("示例数据"), data),
-      "示例数据"
-    );
-    message.success("示例数据加载成功");
-  } catch (error) {
-    message.error(`示例数据加载失败：${getErrorMessage(error)}`);
-  }
-}
-
 function setActiveLayer(layer: WorkspaceLayer) {
   activeLayerKey.value = layer.key;
   selectedFeature.value = undefined;
@@ -383,13 +368,10 @@ function helpHandle() {
     <div class="layer-manager-layer-list">
       <div class="layer-manager-layer-list-search">
         <a-row>
-          <a-col :span="12">
+          <a-col :span="20">
             <a-input v-model:value="searchLayerContent" placeholder="Layer Search..."></a-input>
           </a-col>
-          <a-col :span="6">
-            <a-button block title="加载示例数据" @click="loadSample">示例</a-button>
-          </a-col>
-          <a-col :span="6">
+          <a-col :span="4">
             <a-button block type="primary" title="导入图层" @click="importVisible = true">
               <template #icon><PlusOutlined /></template>
             </a-button>

@@ -2,7 +2,6 @@
 import { ref } from "vue";
 import {
   DownloadOutlined,
-  FolderOpenOutlined,
   TableOutlined,
   CodeOutlined,
   UploadOutlined,
@@ -21,7 +20,6 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: "load-sample"): void;
   (event: "toggle-layers"): void;
   (event: "toggle-editor"): void;
   (event: "export-geojson"): void;
@@ -67,10 +65,6 @@ function switchTileGrid() {
       </a-button>
       <a-button :type="layersOpen ? 'primary' : 'default'" @click="emit('toggle-layers')">
         图层
-      </a-button>
-      <a-button @click="emit('load-sample')">
-        <template #icon><FolderOpenOutlined /></template>
-        示例
       </a-button>
       <a-button :type="editorOpen ? 'primary' : 'default'" @click="emit('toggle-editor')">
         <template #icon><CodeOutlined /></template>
