@@ -1,5 +1,5 @@
 import type { Layer } from "@deck.gl/core";
-import type { MapboxOverlay } from "@deck.gl/mapbox";
+import type { MapLibreOverlay } from "@deck.gl/maplibre";
 import type { IControl, Map as MapLibreMap } from "maplibre-gl";
 
 interface DeckLayerRecord {
@@ -10,7 +10,7 @@ interface DeckLayerRecord {
 }
 
 type DeckModules = {
-  overlay: MapboxOverlay;
+  overlay: MapLibreOverlay;
   Tile3DLayer: typeof import("@deck.gl/geo-layers").Tile3DLayer;
   ScenegraphLayer: typeof import("@deck.gl/mesh-layers").ScenegraphLayer;
   Tiles3DLoader: typeof import("@loaders.gl/3d-tiles").Tiles3DLoader;
@@ -23,18 +23,18 @@ async function ensureOverlay(mapInstance: MapLibreMap) {
   if (modules) return modules;
 
   const [
-    { MapboxOverlay },
+    { MapLibreOverlay },
     { Tile3DLayer },
     { ScenegraphLayer },
     { Tiles3DLoader },
   ] = await Promise.all([
-    import("@deck.gl/mapbox"),
+    import("@deck.gl/maplibre"),
     import("@deck.gl/geo-layers"),
     import("@deck.gl/mesh-layers"),
     import("@loaders.gl/3d-tiles"),
   ]);
 
-  const overlay = new MapboxOverlay({
+  const overlay = new MapLibreOverlay({
     interleaved: true,
     layers: [],
   });
