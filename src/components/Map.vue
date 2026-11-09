@@ -7,6 +7,7 @@
 import { onBeforeUnmount, onMounted } from "vue";
 import MousePos from "./MousePos.vue";
 import { destroyMap, initMap } from "../common/MapUtil";
+import { disposeDeckOverlay } from "../common/DeckOverlayService";
 import type { Map, MapMouseEvent } from "maplibre-gl";
 import { MapMouseMoveHandlers } from "../common/MapEventUtil";
 import { addGeocoderController, addNavigationControl } from "../common/MapController";
@@ -38,6 +39,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (!map) return;
   map.off("mousemove", onMouseMove);
+  disposeDeckOverlay(map);
   destroyMap();
   map = undefined;
 });

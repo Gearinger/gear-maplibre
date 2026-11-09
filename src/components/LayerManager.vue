@@ -16,7 +16,12 @@ import { map } from "../common/MapUtil";
 import FileSelect from "./FileSelect.vue";
 import {
   addGeoJson,
+  addGeoTiffLayer,
+  addModelLayer,
   addPbfLayer,
+  addPmtilesLayer,
+  addTerrainLayer,
+  add3DTilesLayer,
   addTileLayer,
   applyManagedLayerOrder,
   applyManagedLayerStyle,
@@ -42,6 +47,7 @@ const {
  */
 const searchLayerContent = ref("");
 const importVisible = ref(false);
+const importing = ref(false);
 const activeTab = ref("1");
 const editingKey = ref("");
 const editingName = ref("");
@@ -55,7 +61,14 @@ const urlModel = reactive({
   type: "Tile",
   layerName: "layer",
   url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  terrainEncoding: "terrarium" as "mapbox" | "terrarium",
+  longitude: 103,
+  latitude: 38,
+  altitude: 0,
+  scale: 1,
 });
+const modelFileUrl = ref("");
+const modelFileName = ref("");
 
 const filteredLayerList = computed(() => {
   const query = searchLayerContent.value.trim().toLowerCase();
@@ -112,7 +125,8 @@ function getUniqueLayerName(baseName: string) {
   let suffix = 1;
   while (
     map.getSource(candidate) ||
-    (map.getStyle().layers ?? []).some((layer) => layer.id === candidate)
+    (map.getStyle().layers ?? []).some((layer) => layer.id === candidate) ||
+    layers.value.some((layer) => layer.id === candidate)
   ) {
     candidate = `${normalized}-${suffix++}`;
   }
@@ -123,6 +137,9 @@ function registerLayer(managed: Awaited<ReturnType<typeof addGeoJson>>, name: st
   const layer = workspace.addLayer(managed, name);
   applyManagedLayerStyle(layer);
   applyManagedLayerOrder(layers.value);
+  if (layer.type !== "GeoJSON" && layer.bounds) {
+    fitManagedLayer(layer);
+  }
   return layer;
 }
 
@@ -169,29 +186,74 @@ async function importMartinCatalog(catalogUrl: string) {
   if (loaded === 0) throw new Error("Martin Catalog 中没有可用的 PBF 图层");
 }
 
+async function createUrlLayer(layerName: string): Promise<Awaited<ReturnType<typeof addGeoJson>>> {
+  switch (urlModel.type) {
+    case "Tile":
+      return addTileLayer(layerName, urlModel.url);
+    case "Vector Tile":
+      return addPbfLayer(layerName, urlModel.url);
+    case "GeoJSON":
+      return addGeoJson(layerName, urlModel.url);
+    case "PMTiles":
+      return addPmtilesLayer(layerName, urlModel.url);
+    case "GeoTIFF":
+      return addGeoTiffLayer(layerName, urlModel.url);
+    case "Terrain":
+      return addTerrainLayer(layerName, urlModel.url, urlModel.terrainEncoding);
+    case "3D Tiles":
+      return add3DTilesLayer(layerName, urlModel.url);
+    case "Model": {
+      const modelUrl = modelFileUrl.value || urlModel.url;
+      if (!modelUrl) throw new Error("请选择模型文件或填写模型 URL");
+      return addModelLayer(
+        layerName,
+        modelUrl,
+        [urlModel.longitude, urlModel.latitude, urlModel.altitude],
+        urlModel.scale
+      );
+    }
+    default:
+      throw new Error(`暂不支持图层类型：${urlModel.type}`);
+  }
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("模型文件读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function modelFileChanged(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    modelFileUrl.value = await readFileAsDataUrl(file);
+    modelFileName.value = file.name;
+    urlModel.layerName = file.name.replace(/\.[^.]+$/, "");
+    message.success(`已选择模型：${file.name}`);
+  } catch (error) {
+    message.error(`模型读取失败：${getErrorMessage(error)}`);
+  }
+}
+
 async function importfinish() {
   if (activeTab.value === "1") {
     importVisible.value = false;
     return;
   }
 
+  importing.value = true;
   try {
     if (activeTab.value === "2") {
       if (urlModel.type === "Martin Catalog") {
         await importMartinCatalog(urlModel.url);
       } else {
         const layerName = getUniqueLayerName(urlModel.layerName);
-        const layer = urlModel.type === "Tile"
-          ? await addTileLayer(layerName, urlModel.url)
-          : urlModel.type === "Vector Tile"
-            ? await addPbfLayer(layerName, urlModel.url)
-            : urlModel.type === "GeoJSON"
-              ? await addGeoJson(layerName, urlModel.url)
-              : undefined;
-
-        if (!layer) {
-          throw new Error(`暂不支持图层类型：${urlModel.type}`);
-        }
+        const layer = await createUrlLayer(layerName);
         registerLayer(layer, urlModel.layerName || layer.id);
       }
     } else if (activeTab.value === "3") {
@@ -204,6 +266,8 @@ async function importfinish() {
     message.success("图层导入成功！");
   } catch (error) {
     message.error(`图层导入失败：${getErrorMessage(error)}`);
+  } finally {
+    importing.value = false;
   }
 }
 
@@ -310,7 +374,7 @@ function helpHandle() {
             <a-button block type="primary" title="导入图层" @click="importVisible = true">
               <template #icon><PlusOutlined /></template>
             </a-button>
-            <a-modal v-model:open="importVisible" @ok="importfinish">
+            <a-modal v-model:open="importVisible" :confirm-loading="importing" @ok="importfinish">
               <a-tabs size="small" v-model:activeKey="activeTab">
                 <a-tab-pane key="1" tab="file">
                   <FileSelect @load-file="loadFile"></FileSelect>
@@ -322,6 +386,11 @@ function helpHandle() {
                         <a-select-option value="GeoJSON">GeoJSON</a-select-option>
                         <a-select-option value="Tile">XYZ-Tile</a-select-option>
                         <a-select-option value="Vector Tile">Vector Tile</a-select-option>
+                        <a-select-option value="PMTiles">PMTiles</a-select-option>
+                        <a-select-option value="GeoTIFF">GeoTIFF / COG</a-select-option>
+                        <a-select-option value="Terrain">地形</a-select-option>
+                        <a-select-option value="3D Tiles">3D Tiles</a-select-option>
+                        <a-select-option value="Model">glTF / GLB 模型</a-select-option>
                         <a-select-option value="Martin Catalog">Martin Catalog</a-select-option>
                       </a-select>
                     </a-form-item>
@@ -330,7 +399,53 @@ function helpHandle() {
                     </a-form-item>
                     <a-form-item label="url">
                       <a-input v-model:value="urlModel.url" size="small"></a-input>
+                      <div v-if="urlModel.type === 'GeoTIFF'" class="field-hint">
+                        需要 CORS 可访问的 Cloud Optimized GeoTIFF（COG）
+                      </div>
+                      <div v-if="urlModel.type === 'Terrain'" class="field-hint">
+                        TIFF 地址会自动按 COG DEM 读取
+                      </div>
+                      <div v-if="urlModel.type === 'Model'" class="field-hint">
+                        本地 .glb 最稳定；引用外部纹理的 .gltf 请使用完整 URL
+                      </div>
                     </a-form-item>
+                    <a-form-item v-if="urlModel.type === 'Terrain'" label="encoding">
+                      <a-select v-model:value="urlModel.terrainEncoding" size="small">
+                        <a-select-option value="terrarium">Terrarium</a-select-option>
+                        <a-select-option value="mapbox">Mapbox Terrain RGB</a-select-option>
+                      </a-select>
+                    </a-form-item>
+                    <template v-if="urlModel.type === 'Model'">
+                      <a-form-item label="模型文件">
+                        <input type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
+                          @change="modelFileChanged">
+                        <div v-if="modelFileName" class="selected-file">
+                          {{ modelFileName }}
+                          <a-button size="small" type="link"
+                            @click="modelFileUrl = ''; modelFileName = ''">清除</a-button>
+                        </div>
+                      </a-form-item>
+                      <a-row :gutter="8">
+                        <a-col :span="8">
+                          <a-form-item label="经度">
+                            <a-input-number v-model:value="urlModel.longitude" :step="0.0001" />
+                          </a-form-item>
+                        </a-col>
+                        <a-col :span="8">
+                          <a-form-item label="纬度">
+                            <a-input-number v-model:value="urlModel.latitude" :step="0.0001" />
+                          </a-form-item>
+                        </a-col>
+                        <a-col :span="8">
+                          <a-form-item label="高度">
+                            <a-input-number v-model:value="urlModel.altitude" :step="1" />
+                          </a-form-item>
+                        </a-col>
+                      </a-row>
+                      <a-form-item label="缩放">
+                        <a-input-number v-model:value="urlModel.scale" :min="0.0001" :step="0.1" />
+                      </a-form-item>
+                    </template>
                   </a-form>
                 </a-tab-pane>
                 <a-tab-pane key="3" tab="text" force-render>
@@ -513,5 +628,18 @@ function helpHandle() {
 .file-import-area-hint {
   font-size: 9px;
   opacity: 0.5;
+}
+
+.selected-file {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+}
+
+.field-hint {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 10px;
+  line-height: 1.45;
 }
 </style>

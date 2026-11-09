@@ -90,7 +90,12 @@ import { parseGeoJsonAsync } from "../common/GeoJsonParser";
 import { createSnapshotHistory } from "../common/SnapshotHistory";
 import {
   addGeoJson,
+  addGeoTiffLayer,
+  addModelLayer,
   addPbfLayer,
+  addPmtilesLayer,
+  addTerrainLayer,
+  add3DTilesLayer,
   addTileLayer,
   applyManagedLayerOrder,
   applyManagedLayerStyle,
@@ -530,6 +535,25 @@ async function restoreWorkspace(snapshot: WorkspaceSnapshot) {
       let managed;
       if (saved.type === "XYZ-Tile" && saved.url) {
         managed = await addTileLayer(saved.id, saved.url);
+      } else if (saved.type === "PMTiles" && saved.url) {
+        managed = await addPmtilesLayer(saved.id, saved.url);
+      } else if (saved.type === "GeoTIFF" && saved.url) {
+        managed = await addGeoTiffLayer(saved.id, saved.url);
+      } else if (saved.type === "Terrain" && saved.url) {
+        managed = await addTerrainLayer(
+          saved.id,
+          saved.url,
+          saved.terrainEncoding ?? "terrarium"
+        );
+      } else if (saved.type === "3D Tiles" && saved.url) {
+        managed = await add3DTilesLayer(saved.id, saved.url);
+      } else if (saved.type === "Model" && saved.url && saved.coordinates) {
+        managed = await addModelLayer(
+          saved.id,
+          saved.url,
+          saved.coordinates,
+          saved.modelScale ?? 1
+        );
       } else if (saved.type === "Vector Tile" && saved.url) {
         managed = await addPbfLayer(saved.id, saved.url);
       } else if (saved.data) {

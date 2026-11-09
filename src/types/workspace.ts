@@ -1,4 +1,13 @@
-export type WorkspaceLayerType = "GeoJSON" | "XYZ-Tile" | "Vector Tile" | "FlatGeobuf";
+export type WorkspaceLayerType =
+  | "GeoJSON"
+  | "XYZ-Tile"
+  | "Vector Tile"
+  | "FlatGeobuf"
+  | "PMTiles"
+  | "GeoTIFF"
+  | "Terrain"
+  | "3D Tiles"
+  | "Model";
 
 export type LayerBounds = [number, number, number, number];
 
@@ -17,6 +26,10 @@ export interface ManagedLayer {
   url?: string;
   featureCount?: number;
   bounds?: LayerBounds;
+  engine?: "maplibre" | "deck";
+  coordinates?: [number, number, number];
+  modelScale?: number;
+  terrainEncoding?: "mapbox" | "terrarium";
 }
 
 export interface WorkspaceLayer extends ManagedLayer {

@@ -3,6 +3,20 @@ import { bbox } from "@turf/turf";
 import type { GeoJSONSource } from "maplibre-gl";
 import { map } from "./MapUtil";
 import type { LayerBounds, ManagedLayer, WorkspaceLayer } from "../types/workspace";
+import {
+    add3DTilesDeckLayer,
+    addModelDeckLayer,
+    removeDeckLayer,
+    reorderDeckLayers,
+    setDeckLayerOpacity,
+    setDeckLayerVisibility,
+} from "./DeckOverlayService";
+import {
+    cogUrl,
+    ensureCogProtocol,
+    getCogBounds,
+    openPmtilesArchive,
+} from "./SpatialProtocols";
 
 function getFeatureCount(data: GeoJSON.GeoJSON) {
     return "features" in data ? data.features.length : 1;
@@ -236,6 +250,17 @@ export async function addTileLayer(layerName: string, url: string): Promise<Mana
 }
 
 export function setManagedLayerVisibility(layer: ManagedLayer, visible: boolean) {
+    if (layer.engine === "deck") {
+        setDeckLayerVisibility(layer.id, visible);
+        return;
+    }
+    if (layer.type === "Terrain") {
+        if (!visible) {
+            map.setTerrain(null);
+        } else if (map.getSource(layer.source)) {
+            map.setTerrain({ source: layer.source, exaggeration: 1.2 });
+        }
+    }
     for (const layerId of layer.styleLayerIds) {
         if (map.getLayer(layerId)) {
             map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
@@ -245,6 +270,10 @@ export function setManagedLayerVisibility(layer: ManagedLayer, visible: boolean)
 
 export function setManagedLayerOpacity(layer: ManagedLayer, opacity: number) {
     const value = Math.min(1, Math.max(0, opacity));
+    if (layer.engine === "deck") {
+        setDeckLayerOpacity(layer.id, value);
+        return;
+    }
     for (const layerId of layer.styleLayerIds) {
         const styleLayer = map.getLayer(layerId);
         if (!styleLayer) continue;
@@ -271,6 +300,7 @@ export function setManagedLayerOpacity(layer: ManagedLayer, opacity: number) {
 }
 
 export function applyManagedLayerStyle(layer: WorkspaceLayer) {
+    if (layer.engine === "deck") return;
     for (const layerId of layer.styleLayerIds) {
         const styleLayer = map.getLayer(layerId);
         if (!styleLayer) continue;
@@ -296,6 +326,11 @@ export function applyManagedLayerStyle(layer: WorkspaceLayer) {
 }
 
 export function applyManagedLayerOrder(orderedLayers: WorkspaceLayer[]) {
+    reorderDeckLayers(
+        orderedLayers
+            .filter((layer) => layer.engine === "deck")
+            .map((layer) => layer.id)
+    );
     // Workspace order is top-to-bottom; MapLibre draws later layers above earlier ones.
     for (const layer of [...orderedLayers].reverse()) {
         for (const layerId of layer.styleLayerIds) {
@@ -305,6 +340,14 @@ export function applyManagedLayerOrder(orderedLayers: WorkspaceLayer[]) {
 }
 
 export function fitManagedLayer(layer: ManagedLayer) {
+    if (layer.coordinates) {
+        map.flyTo({
+            center: [layer.coordinates[0], layer.coordinates[1]],
+            zoom: Math.max(map.getZoom(), 15),
+            pitch: 50,
+        });
+        return true;
+    }
     if (!layer.bounds) return false;
     map.fitBounds(
         [[layer.bounds[0], layer.bounds[1]], [layer.bounds[2], layer.bounds[3]]],
@@ -325,8 +368,193 @@ export function updateManagedGeoJson(layer: ManagedLayer, data: GeoJSON.GeoJSON)
 }
 
 export function removeManagedLayer(layer: ManagedLayer) {
+    if (layer.engine === "deck") {
+        removeDeckLayer(layer.id);
+        return;
+    }
+    if (layer.type === "Terrain" && map.getTerrain()?.source === layer.source) {
+        map.setTerrain(null);
+    }
     for (const layerId of layer.styleLayerIds) {
         if (map.getLayer(layerId)) map.removeLayer(layerId);
     }
     if (map.getSource(layer.source)) map.removeSource(layer.source);
+}
+
+export async function addPmtilesLayer(
+    layerName: string,
+    tileUrl: string
+): Promise<ManagedLayer> {
+    const source = `source-${layerName}`;
+    if (map.getSource(source) || map.getLayer(layerName)) {
+        throw new Error(`图层已存在：${layerName}`);
+    }
+
+    const { archive, protocolUrl } = await openPmtilesArchive(tileUrl);
+    const [header, metadata] = await Promise.all([
+        archive.getHeader(),
+        archive.getMetadata(),
+    ]);
+    const bounds: LayerBounds = [
+        header.minLon,
+        header.minLat,
+        header.maxLon,
+        header.maxLat,
+    ];
+    const styleLayerIds: string[] = [];
+
+    if (header.tileType === 1) {
+        const vectorLayers = (
+            metadata as { vector_layers?: Array<{ id?: string }> }
+        )?.vector_layers;
+        const sourceLayer = vectorLayers?.[0]?.id ?? layerName;
+        map.addSource(source, {
+            type: "vector",
+            url: protocolUrl,
+        });
+        for (const [suffix, type, paint] of [
+            ["fill", "fill", { "fill-color": "#38bdf8", "fill-opacity": 0.45, "fill-outline-color": "#38bdf8" }],
+            ["line", "line", { "line-color": "#38bdf8", "line-width": 1.5 }],
+            ["point", "circle", { "circle-color": "#38bdf8", "circle-radius": 4 }],
+        ] as const) {
+            const id = `${layerName}-${suffix}`;
+            map.addLayer({
+                id,
+                type,
+                source,
+                "source-layer": sourceLayer,
+                paint,
+            } as never);
+            styleLayerIds.push(id);
+        }
+    } else if ([2, 3, 4, 5].includes(header.tileType)) {
+        map.addSource(source, {
+            type: "raster",
+            url: protocolUrl,
+            tileSize: 256,
+        });
+        map.addLayer({
+            id: layerName,
+            type: "raster",
+            source,
+        });
+        styleLayerIds.push(layerName);
+    } else {
+        throw new Error(`暂不支持该 PMTiles 类型：${header.tileType}`);
+    }
+
+    return {
+        id: layerName,
+        type: "PMTiles",
+        source,
+        styleLayerIds,
+        url: tileUrl,
+        bounds,
+    };
+}
+
+export async function addGeoTiffLayer(
+    layerName: string,
+    tileUrl: string
+): Promise<ManagedLayer> {
+    const source = `source-${layerName}`;
+    if (map.getSource(source) || map.getLayer(layerName)) {
+        throw new Error(`图层已存在：${layerName}`);
+    }
+    await ensureCogProtocol();
+    let bounds: LayerBounds | undefined;
+    try {
+        bounds = await getCogBounds(tileUrl);
+    } catch (error) {
+        console.warn("Unable to read COG bounds:", error);
+    }
+    map.addSource(source, {
+        type: "raster",
+        url: cogUrl(tileUrl),
+        tileSize: 256,
+    });
+    map.addLayer({
+        id: layerName,
+        type: "raster",
+        source,
+    });
+    return {
+        id: layerName,
+        type: "GeoTIFF",
+        source,
+        styleLayerIds: [layerName],
+        url: tileUrl,
+        bounds,
+    };
+}
+
+export async function addTerrainLayer(
+    layerName: string,
+    terrainUrl: string,
+    encoding: "mapbox" | "terrarium" = "terrarium"
+): Promise<ManagedLayer> {
+    const source = `source-${layerName}`;
+    const hillshadeId = `${layerName}-hillshade`;
+    if (map.getSource(source) || map.getLayer(hillshadeId)) {
+        throw new Error(`地形已存在：${layerName}`);
+    }
+    const isCog = /\.tiff?(?:[?#].*)?$/i.test(terrainUrl);
+    if (isCog) await ensureCogProtocol();
+    map.addSource(source, {
+        type: "raster-dem",
+        url: isCog ? cogUrl(terrainUrl, true) : terrainUrl,
+        tileSize: 256,
+        encoding: isCog ? "mapbox" : encoding,
+    });
+    map.addLayer({
+        id: hillshadeId,
+        type: "hillshade",
+        source,
+        paint: {
+            "hillshade-exaggeration": 0.35,
+        },
+    });
+    map.setTerrain({ source, exaggeration: 1.2 });
+    return {
+        id: layerName,
+        type: "Terrain",
+        source,
+        styleLayerIds: [hillshadeId],
+        url: terrainUrl,
+        terrainEncoding: isCog ? "mapbox" : encoding,
+    };
+}
+
+export async function add3DTilesLayer(
+    layerName: string,
+    tilesetUrl: string
+): Promise<ManagedLayer> {
+    await add3DTilesDeckLayer(map, layerName, tilesetUrl);
+    return {
+        id: layerName,
+        type: "3D Tiles",
+        source: layerName,
+        styleLayerIds: [],
+        url: tilesetUrl,
+        engine: "deck",
+    };
+}
+
+export async function addModelLayer(
+    layerName: string,
+    modelUrl: string,
+    coordinates: [number, number, number],
+    scale = 1
+): Promise<ManagedLayer> {
+    await addModelDeckLayer(map, layerName, modelUrl, coordinates, scale);
+    return {
+        id: layerName,
+        type: "Model",
+        source: layerName,
+        styleLayerIds: [],
+        url: modelUrl,
+        coordinates,
+        modelScale: scale,
+        engine: "deck",
+    };
 }

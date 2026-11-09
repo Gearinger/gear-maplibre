@@ -3,6 +3,8 @@
 主要功能：
 
 - 导入本地 GeoJSON、URL 数据、XYZ 瓦片、矢量瓦片和 Martin Catalog。
+- 通过 URL 预览 PMTiles、Cloud Optimized GeoTIFF、地形 DEM 和 3D Tiles。
+- 预览本地 glTF/GLB 模型，或将模型放置在指定经纬度和高度。
 - 图层重命名、搜索、排序、显隐、透明度和范围定位。
 - GeoJSON 颜色、线宽和点半径样式编辑。
 - 编辑 GeoJSON 后实时更新地图。
@@ -42,6 +44,14 @@ bun test
 - `Ctrl/Cmd + S`：导出项目
 - `Ctrl/Cmd + O`：打开项目
 - `Esc`：结束绘制或清空要素选择
+
+格式说明：
+
+- PMTiles 支持栅格与 MVT 矢量瓦片，文件需允许 CORS 范围请求。
+- GeoTIFF 使用浏览器端 COG 协议，当前要求数据为 Cloud Optimized GeoTIFF。
+- 地形支持普通 Terrain RGB/Terrarium 服务和 COG DEM。
+- 3D Tiles 与 glTF/GLB 使用 deck.gl 叠加层，并在首次使用时动态加载。
+- 本地 glTF 建议使用内嵌资源的 `.glb`；引用外部纹理的 `.gltf` 建议使用完整 URL。
 
 环境变量说明：
 

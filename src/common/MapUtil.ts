@@ -59,12 +59,6 @@ export function markCurrentPos() {
         var marker = new Marker({ element: htmlEle })
             .setLngLat(new LngLat(e.coords.longitude, e.coords.latitude))
             .addTo(map);
-        // var marker = new Marker({ color: "#ff0000" })
-        //     // 设置标记位置
-        //     .setLngLat(new LngLat(e.coords.longitude, e.coords.latitude))
-        //     // 添加弹出框
-        //     .setPopup(new Popup().setHTML(e.coords.longitude + "_" + e.coords.latitude + "_" + e.coords.altitude))
-        //     .addTo(map);
     }, () => {
         alert("定位失败！");
     });
