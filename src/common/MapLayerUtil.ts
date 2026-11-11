@@ -19,6 +19,7 @@ import {
     openPmtilesArchive,
 } from "./SpatialProtocols";
 import { featureStateColor, featureStateNumber } from "./MapStyleUtil";
+import { normalizeResourceUrl } from "./ResourceUrl";
 
 function getFeatureCount(data: GeoJSON.GeoJSON) {
     return "features" in data ? data.features.length : 1;
@@ -523,13 +524,14 @@ export async function add3DTilesLayer(
     layerName: string,
     tilesetUrl: string
 ): Promise<ManagedLayer> {
-    const info = await add3DTilesDeckLayer(map, layerName, tilesetUrl);
+    const normalizedUrl = normalizeResourceUrl(tilesetUrl);
+    const info = await add3DTilesDeckLayer(map, layerName, normalizedUrl);
     return {
         id: layerName,
         type: "3D Tiles",
         source: layerName,
         styleLayerIds: [],
-        url: tilesetUrl,
+        url: normalizedUrl,
         engine: "deck",
         coordinates: info?.coordinates,
         focusZoom: info?.zoom,
@@ -542,13 +544,14 @@ export async function addModelLayer(
     coordinates: [number, number, number],
     scale = 1
 ): Promise<ManagedLayer> {
-    await addModelDeckLayer(map, layerName, modelUrl, coordinates, scale);
+    const normalizedUrl = normalizeResourceUrl(modelUrl);
+    await addModelDeckLayer(map, layerName, normalizedUrl, coordinates, scale);
     return {
         id: layerName,
         type: "Model",
         source: layerName,
         styleLayerIds: [],
-        url: modelUrl,
+        url: normalizedUrl,
         coordinates,
         modelScale: scale,
         engine: "deck",
