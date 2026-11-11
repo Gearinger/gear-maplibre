@@ -7,6 +7,7 @@
 - 通过 URL 预览 PMTiles、Cloud Optimized GeoTIFF、地形 DEM 和 3D Tiles。
 - 预览本地 glTF/GLB 模型，或将模型放置在指定经纬度和高度。
 - 图层重命名、搜索、排序、显隐、透明度和范围定位。
+- 图层显示加载中、部分失败和加载失败状态，异步错误会反馈到图层列表。
 - GeoJSON 颜色、线宽和点半径样式编辑。
 - 编辑 GeoJSON 后实时更新地图。
 - 在地图上绘制点、线和面到当前 GeoJSON 图层。
@@ -14,6 +15,7 @@
 - 支持工作区级别的撤销和重做。
 - 超过 512 KB 的 GeoJSON 在 Web Worker 中解析，避免阻塞地图交互。
 - 项目自动保存到浏览器 IndexedDB。
+- 本地模型以 Blob 保存，历史快照只引用资源 ID；导出项目时再嵌入模型数据。
 - 导入/导出 `.gear-map.json` 项目文件，单独导出当前 GeoJSON。
 - 瓦片网格和鼠标坐标辅助调试。
 
@@ -53,7 +55,9 @@ bun test
 - GeoTIFF 使用浏览器端 COG 协议，当前要求数据为 Cloud Optimized GeoTIFF。
 - 地形支持普通 Terrain RGB/Terrarium 服务和 COG DEM。
 - 3D Tiles 与 glTF/GLB 使用 deck.gl 叠加层，并在首次使用时动态加载。
+- 矢量瓦片支持独立填写 TileJSON 的 `source-layer`；不填写时会尝试从 TileJSON 自动读取。
 - 本地 glTF 建议使用内嵌资源的 `.glb`；引用外部纹理的 `.gltf` 建议使用完整 URL。
+- 本地 `.gltf` 必须内嵌 buffer 和图片，引用外部文件的 `.gltf` 请使用完整 URL。
 - 本地模型默认放在当前地图中心，可在样式面板中修改经纬度、高度和缩放。
 
 环境变量说明：

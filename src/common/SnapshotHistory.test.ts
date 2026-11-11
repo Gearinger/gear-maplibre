@@ -44,4 +44,18 @@ describe("snapshot history", () => {
     expect(history.entries.value.map((item) => item.value)).toEqual([2, 3]);
     expect(history.undo()?.value).toBe(2);
   });
+
+  test("drops the oldest snapshots when the memory budget is exceeded", () => {
+    const history = createSnapshotHistory<{ value: string }>(
+      (snapshot) => snapshot.value,
+      10,
+      10
+    );
+    history.reset({ value: "1234" });
+    history.push({ value: "5678" });
+    history.push({ value: "90ab" });
+
+    expect(history.entries.value.map((item) => item.value)).toEqual(["5678", "90ab"]);
+    expect(history.canUndo.value).toBe(true);
+  });
 });

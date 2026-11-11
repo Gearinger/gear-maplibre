@@ -72,4 +72,38 @@ describe("workspace store", () => {
     expect(workspace.layers.value[0].opacity).toBe(0.4);
     expect(workspace.activeLayer.value?.name).toBe("Legacy");
   });
+
+  test("keeps runtime asset URLs out of snapshots", () => {
+    const layer = workspace.addLayer({
+      id: "model",
+      type: "Model",
+      source: "model",
+      styleLayerIds: [],
+      url: "blob:https://example.test/runtime-model",
+      assetId: "asset-1",
+      assetName: "model.glb",
+      coordinates: [120, 30, 0],
+    });
+
+    const snapshot = workspace.snapshot();
+
+    expect(layer.url).toBe("blob:https://example.test/runtime-model");
+    expect(snapshot.layers[0].assetId).toBe("asset-1");
+    expect(snapshot.layers[0].url).toBeUndefined();
+    expect(snapshot.layers[0].loadStatus?.phase).toBe("ready");
+  });
+
+  test("updates asynchronous layer status in place", () => {
+    const layer = workspace.addLayer(geoJsonLayer("status"), "Status");
+
+    workspace.patchLayerLoadStatus(layer.key, {
+      phase: "partial",
+      failedTiles: 3,
+      message: "3 tiles failed",
+    });
+
+    expect(layer.loadStatus?.phase).toBe("partial");
+    expect(layer.loadStatus?.failedTiles).toBe(3);
+    expect(layer.loadStatus?.message).toBe("3 tiles failed");
+  });
 });

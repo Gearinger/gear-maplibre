@@ -17,6 +17,16 @@ export interface LayerStyle {
   pointRadius: number;
 }
 
+export type LayerLoadPhase = "loading" | "ready" | "partial" | "error";
+
+export interface LayerLoadStatus {
+  phase: LayerLoadPhase;
+  message?: string;
+  loadedTiles: number;
+  failedTiles: number;
+  updatedAt: string;
+}
+
 export interface ManagedLayer {
   id: string;
   type: WorkspaceLayerType | string;
@@ -31,6 +41,12 @@ export interface ManagedLayer {
   focusZoom?: number;
   modelScale?: number;
   terrainEncoding?: "mapbox" | "terrarium";
+  sourceLayer?: string;
+  loadStatus?: LayerLoadStatus;
+  assetId?: string;
+  assetName?: string;
+  assetMimeType?: string;
+  assetSize?: number;
 }
 
 export interface WorkspaceLayer extends ManagedLayer {

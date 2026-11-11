@@ -1,12 +1,18 @@
 import type { Layer } from "@deck.gl/core";
 import type { MapLibreOverlay } from "@deck.gl/maplibre";
 import type { IControl, Map as MapLibreMap } from "maplibre-gl";
+import type { LayerLoadStatus } from "../types/workspace";
+import {
+  createLayerLoadStatus,
+  updateLayerLoadStatus,
+} from "./LayerLoadStatus";
 
 interface DeckLayerRecord {
   id: string;
   layer: Layer;
   visible: boolean;
   opacity: number;
+  loadStatus?: LayerLoadStatus;
 }
 
 type DeckModules = {
@@ -29,6 +35,17 @@ function getDecoderModules() {
     "basis_encoder.js": assetUrl("textures/basis_encoder.js"),
     "basis_encoder.wasm": assetUrl("textures/basis_encoder.wasm"),
   };
+}
+
+async function loadModelScenegraph(url: string) {
+  const [{ load }, { GLTFLoader }] = await Promise.all([
+    import("@loaders.gl/core"),
+    import("@loaders.gl/gltf"),
+  ]);
+  return load(url, GLTFLoader, {
+    useLocalLibraries: true,
+    modules: getDecoderModules(),
+  });
 }
 
 async function ensureOverlay(mapInstance: MapLibreMap) {
@@ -75,14 +92,27 @@ function syncLayers() {
 export async function add3DTilesDeckLayer(
   mapInstance: MapLibreMap,
   id: string,
-  url: string
+  url: string,
+  loadStatus = createLayerLoadStatus("loading")
 ) {
   const { Tile3DLayer, Tiles3DLoader } = await ensureOverlay(mapInstance);
+  updateLayerLoadStatus(loadStatus, {
+    phase: "loading",
+    message: "正在加载 tileset",
+    loadedTiles: 0,
+    failedTiles: 0,
+  });
   return new Promise<{
     coordinates: [number, number, number];
     zoom: number;
   } | undefined>((resolve) => {
-    const timeout = setTimeout(() => resolve(undefined), 15_000);
+    const timeout = setTimeout(() => {
+      updateLayerLoadStatus(loadStatus, {
+        phase: "error",
+        message: "Tileset 加载超时",
+      });
+      resolve(undefined);
+    }, 15_000);
     const layer = new Tile3DLayer({
       id,
       data: url,
@@ -98,6 +128,10 @@ export async function add3DTilesDeckLayer(
       pickable: false,
       onTilesetLoad: (tileset) => {
         clearTimeout(timeout);
+        updateLayerLoadStatus(loadStatus, {
+          phase: "ready",
+          message: "Tileset 已加载",
+        });
         const center = tileset.cartographicCenter;
         if (!center) {
           resolve(undefined);
@@ -115,15 +149,37 @@ export async function add3DTilesDeckLayer(
           zoom,
         });
       },
+      onTileLoad: () => {
+        loadStatus.loadedTiles += 1;
+        updateLayerLoadStatus(loadStatus, {
+          phase: loadStatus.failedTiles > 0 ? "partial" : "ready",
+          message: loadStatus.failedTiles > 0
+            ? `已加载 ${loadStatus.loadedTiles} 个瓦片，${loadStatus.failedTiles} 个失败`
+            : `已加载 ${loadStatus.loadedTiles} 个瓦片`,
+        });
+      },
       onTileError: (tile, tileUrl, message) => {
+        loadStatus.failedTiles += 1;
+        updateLayerLoadStatus(loadStatus, {
+          phase: loadStatus.loadedTiles > 0 ? "partial" : "error",
+          message: `瓦片加载失败：${message || tileUrl || tile?.id || "未知错误"}`,
+        });
         console.error("3D Tiles tile failed", {
           id: tile?.id,
           url: tileUrl,
           message,
         });
       },
+      onError: (error) => {
+        clearTimeout(timeout);
+        updateLayerLoadStatus(loadStatus, {
+          phase: "error",
+          message: error.message,
+        });
+        console.error("3D Tiles layer failed", error);
+      },
     });
-    records.set(id, { id, layer, visible: true, opacity: 1 });
+    records.set(id, { id, layer, visible: true, opacity: 1, loadStatus });
     syncLayers();
   });
 }
@@ -133,37 +189,63 @@ export async function addModelDeckLayer(
   id: string,
   url: string,
   coordinates: [number, number, number],
-  scale = 1
+  scale = 1,
+  loadStatus = createLayerLoadStatus("loading")
 ) {
   const { ScenegraphLayer } = await ensureOverlay(mapInstance);
+  updateLayerLoadStatus(loadStatus, {
+    phase: "loading",
+    message: "正在加载模型",
+    loadedTiles: 0,
+    failedTiles: 0,
+  });
+  let scenegraph: unknown;
+  try {
+    scenegraph = await loadModelScenegraph(url);
+    updateLayerLoadStatus(loadStatus, {
+      phase: "ready",
+      message: "模型已加载",
+      loadedTiles: 1,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    updateLayerLoadStatus(loadStatus, {
+      phase: "error",
+      message,
+    });
+    throw error;
+  }
   const layer = createModelLayer(
     ScenegraphLayer,
     id,
-    url,
+    scenegraph,
     coordinates,
     scale
   );
-  records.set(id, { id, layer, visible: true, opacity: 1 });
+  records.set(id, { id, layer, visible: true, opacity: 1, loadStatus });
   syncLayers();
 }
 
 function createModelLayer(
   ScenegraphLayer: DeckModules["ScenegraphLayer"],
   id: string,
-  url: string,
+  scenegraph: unknown,
   coordinates: [number, number, number],
   scale: number
 ) {
   return new ScenegraphLayer({
     id,
     data: [{ position: coordinates }],
-    scenegraph: url,
+    scenegraph,
     getPosition: (item: { position: [number, number, number] }) => item.position,
     getOrientation: () => [0, 0, 0],
     getScale: () => [scale, scale, scale],
     sizeMinPixels: 0.1,
     _lighting: "pbr",
     pickable: false,
+    onError: (error: Error) => {
+      console.error("Model layer failed", error);
+    },
   });
 }
 
@@ -177,7 +259,33 @@ export async function updateModelDeckLayer(
   const record = records.get(id);
   if (!record) return false;
   const { ScenegraphLayer } = await ensureOverlay(mapInstance);
-  record.layer = createModelLayer(ScenegraphLayer, id, url, coordinates, scale);
+  const loadStatus = record.loadStatus ?? createLayerLoadStatus("loading");
+  updateLayerLoadStatus(loadStatus, {
+    phase: "loading",
+    message: "正在重新加载模型",
+  });
+  record.loadStatus = loadStatus;
+  try {
+    const scenegraph = await loadModelScenegraph(url);
+    updateLayerLoadStatus(loadStatus, {
+      phase: "ready",
+      message: "模型已加载",
+      loadedTiles: 1,
+    });
+    record.layer = createModelLayer(
+      ScenegraphLayer,
+      id,
+      scenegraph,
+      coordinates,
+      scale
+    );
+  } catch (error) {
+    updateLayerLoadStatus(loadStatus, {
+      phase: "error",
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
   syncLayers();
   return true;
 }

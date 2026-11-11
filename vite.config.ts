@@ -9,6 +9,22 @@ export default defineConfig({
   build: {
     rolldownOptions: {
       output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: "vendor-ant-design",
+              test: /node_modules\/(?:ant-design-vue|@ant-design|@ctrl|dayjs|async-validator|rc-)/,
+            },
+            {
+              name: "vendor-maplibre",
+              test: /node_modules\/(?:maplibre-gl|@maplibre|@mapbox)/,
+            },
+            {
+              name: "vendor-vue",
+              test: /node_modules\/(?:vue|@vue|vue-router|vue-codemirror)/,
+            },
+          ],
+        },
         assetFileNames: (asset) => {
           const sourceName = asset.names[0] ?? "";
           return sourceName.endsWith(".mjs")

@@ -1,11 +1,13 @@
-import { computed, ref } from "vue";
+import { computed, ref, toRaw } from "vue";
 import type {
   InspectedFeature,
+  LayerLoadStatus,
   LayerStyle,
   ManagedLayer,
   WorkspaceLayer,
   WorkspaceSnapshot,
 } from "../types/workspace";
+import { createLayerLoadStatus, updateLayerLoadStatus } from "../common/LayerLoadStatus";
 
 const projectName = ref("未命名地图");
 const layers = ref<WorkspaceLayer[]>([]);
@@ -40,10 +42,30 @@ function addLayer(layer: ManagedLayer, name = layer.id) {
     visible: true,
     opacity: 1,
     style: { ...defaultLayerStyle },
+    loadStatus: layer.loadStatus ?? createLayerLoadStatus("ready"),
   };
   layers.value.push(workspaceLayer);
   activeLayerKey.value = workspaceLayer.key;
   return workspaceLayer;
+}
+
+function setLayerLoadStatus(key: string, status: LayerLoadStatus) {
+  const layer = layers.value.find((candidate) => candidate.key === key);
+  if (!layer) return false;
+  layer.loadStatus = status;
+  return true;
+}
+
+function patchLayerLoadStatus(
+  key: string,
+  patch: Partial<Omit<LayerLoadStatus, "updatedAt">>
+) {
+  const layer = layers.value.find((candidate) => candidate.key === key);
+  if (!layer) return false;
+  const status = layer.loadStatus ?? createLayerLoadStatus("loading");
+  updateLayerLoadStatus(status, patch);
+  layer.loadStatus = { ...status };
+  return true;
 }
 
 function removeLayer(key: string) {
@@ -63,11 +85,21 @@ function clearLayers() {
 }
 
 function snapshot(): WorkspaceSnapshot {
+  const snapshotLayers = layers.value.map((layer) => {
+    const plainLayer = toRaw(layer);
+    return {
+      ...plainLayer,
+      style: { ...plainLayer.style },
+      loadStatus: plainLayer.loadStatus ? { ...plainLayer.loadStatus } : undefined,
+      data: plainLayer.data ? structuredClone(toRaw(plainLayer.data)) : undefined,
+      url: plainLayer.assetId ? undefined : plainLayer.url,
+    };
+  });
   return {
     version: 1,
     projectName: projectName.value,
     activeLayerKey: activeLayerKey.value,
-    layers: layers.value,
+    layers: snapshotLayers,
     savedAt: new Date().toISOString(),
   };
 }
@@ -81,6 +113,7 @@ function restoreSnapshot(value: WorkspaceSnapshot) {
       ...defaultLayerStyle,
       ...layer.style,
     },
+    loadStatus: layer.loadStatus ?? createLayerLoadStatus("ready"),
   }));
   activeLayerKey.value =
     layers.value.find((layer) => layer.key === value.activeLayerKey)?.key
@@ -112,6 +145,8 @@ export function useWorkspace() {
     rightPanelTab,
     saving,
     addLayer,
+    setLayerLoadStatus,
+    patchLayerLoadStatus,
     removeLayer,
     moveLayer,
     clearLayers,

@@ -20,6 +20,7 @@ import {
 } from "./SpatialProtocols";
 import { featureStateColor, featureStateNumber } from "./MapStyleUtil";
 import { normalizeResourceUrl } from "./ResourceUrl";
+import { createLayerLoadStatus } from "./LayerLoadStatus";
 
 function getFeatureCount(data: GeoJSON.GeoJSON) {
     return "features" in data ? data.features.length : 1;
@@ -165,38 +166,112 @@ export async function addGeoJson(
 /**
  * 添加pbf数据到地图上
  */
+function findVectorSourceByUrl(vectorTileUrl: string) {
+    const sources = map.getStyle().sources ?? {};
+    for (const [sourceId, source] of Object.entries(sources)) {
+        if (source.type !== "vector") continue;
+        if (source.url === vectorTileUrl) return sourceId;
+        if (source.tiles?.includes(vectorTileUrl)) return sourceId;
+    }
+    return undefined;
+}
+
+async function resolvePbfSourceLayer(
+    vectorTileUrl: string,
+    requestedSourceLayer?: string
+) {
+    const requested = requestedSourceLayer?.trim();
+    if (requested) return requested;
+    if (vectorTileUrl.includes("{z}")) return undefined;
+
+    try {
+        const response = await fetch(vectorTileUrl);
+        if (!response.ok) return undefined;
+        const metadata = await response.json() as {
+            vector_layers?: Array<{ id?: string }>;
+        };
+        return metadata.vector_layers?.find((layer) => layer.id)?.id;
+    } catch {
+        return undefined;
+    }
+}
+
 export async function addPbfLayer(
     layerName: string,
     vectorTileUrl: string,
-    paint?: Record<string, unknown>
+    requestedSourceLayer?: string
 ): Promise<ManagedLayer> {
+    const sourceLayer = await resolvePbfSourceLayer(
+        vectorTileUrl,
+        requestedSourceLayer
+    ) ?? layerName;
     const source = "source-" + layerName;
-    if (map.getSource(source) || map.getLayer(layerName)) {
+    const styleLayerIds = [
+        `${layerName}-fill`,
+        `${layerName}-line`,
+        `${layerName}-point`,
+    ];
+    if (styleLayerIds.some((layerId) => map.getLayer(layerId))) {
         throw new Error(`图层已存在：${layerName}`);
     }
+    if (!vectorTileUrl.includes("{z}") && /\.pbf(?:[?#].*)?$/i.test(vectorTileUrl)) {
+        throw new Error("单个 PBF 瓦片不能作为矢量底图，请使用 TileJSON 或 {z}/{x}/{y} 模板");
+    }
 
-    map.addSource(source, vectorTileUrl.includes("{z}")
-        ? { type: "vector", tiles: [vectorTileUrl] }
-        : { type: "vector", url: vectorTileUrl });
+    const existingSource = findVectorSourceByUrl(vectorTileUrl);
+    const sourceId = existingSource ?? source;
+    if (!existingSource) {
+        map.addSource(sourceId, vectorTileUrl.includes("{z}")
+            ? { type: "vector", tiles: [vectorTileUrl] }
+            : { type: "vector", url: vectorTileUrl });
+    }
     try {
         map.addLayer({
-            id: layerName,
+            id: styleLayerIds[0],
+            type: "fill",
+            source: sourceId,
+            "source-layer": sourceLayer,
+            paint: {
+                "fill-color": featureStateColor("#38bdf8"),
+                "fill-opacity": 0.45,
+                "fill-outline-color": featureStateColor("#38bdf8"),
+            },
+        });
+        map.addLayer({
+            id: styleLayerIds[1],
+            type: "line",
+            source: sourceId,
+            "source-layer": sourceLayer,
+            paint: {
+                "line-color": featureStateColor("#38bdf8"),
+                "line-width": featureStateNumber(1.5, 3, 4.5),
+            },
+        });
+        map.addLayer({
+            id: styleLayerIds[2],
             type: "circle",
-            source,
-            "source-layer": layerName,
-            ...(paint ? { paint } : {}),
+            source: sourceId,
+            "source-layer": sourceLayer,
+            paint: {
+                "circle-color": featureStateColor("#38bdf8"),
+                "circle-radius": featureStateNumber(4, 6, 8),
+            },
         });
     } catch (error) {
-        map.removeSource(source);
+        for (const layerId of styleLayerIds) {
+            if (map.getLayer(layerId)) map.removeLayer(layerId);
+        }
+        if (!existingSource && map.getSource(sourceId)) map.removeSource(sourceId);
         throw error;
     }
 
     return {
         id: layerName,
         type: "Vector Tile",
-        source,
-        styleLayerIds: [layerName],
+        source: sourceId,
+        styleLayerIds,
         url: vectorTileUrl,
+        sourceLayer,
     };
 }
 
@@ -373,7 +448,12 @@ export function removeManagedLayer(layer: ManagedLayer) {
     for (const layerId of layer.styleLayerIds) {
         if (map.getLayer(layerId)) map.removeLayer(layerId);
     }
-    if (map.getSource(layer.source)) map.removeSource(layer.source);
+    const sourceStillUsed = (map.getStyle().layers ?? []).some(
+        (styleLayer) => "source" in styleLayer && styleLayer.source === layer.source
+    );
+    if (!sourceStillUsed && map.getSource(layer.source)) {
+        map.removeSource(layer.source);
+    }
 }
 
 export async function addPmtilesLayer(
@@ -525,7 +605,13 @@ export async function add3DTilesLayer(
     tilesetUrl: string
 ): Promise<ManagedLayer> {
     const normalizedUrl = normalizeResourceUrl(tilesetUrl);
-    const info = await add3DTilesDeckLayer(map, layerName, normalizedUrl);
+    const loadStatus = createLayerLoadStatus("loading");
+    const info = await add3DTilesDeckLayer(
+        map,
+        layerName,
+        normalizedUrl,
+        loadStatus
+    );
     return {
         id: layerName,
         type: "3D Tiles",
@@ -535,6 +621,7 @@ export async function add3DTilesLayer(
         engine: "deck",
         coordinates: info?.coordinates,
         focusZoom: info?.zoom,
+        loadStatus,
     };
 }
 
@@ -545,7 +632,15 @@ export async function addModelLayer(
     scale = 1
 ): Promise<ManagedLayer> {
     const normalizedUrl = normalizeResourceUrl(modelUrl);
-    await addModelDeckLayer(map, layerName, normalizedUrl, coordinates, scale);
+    const loadStatus = createLayerLoadStatus("loading");
+    await addModelDeckLayer(
+        map,
+        layerName,
+        normalizedUrl,
+        coordinates,
+        scale,
+        loadStatus
+    );
     return {
         id: layerName,
         type: "Model",
@@ -555,6 +650,7 @@ export async function addModelLayer(
         coordinates,
         modelScale: scale,
         engine: "deck",
+        loadStatus,
     };
 }
 

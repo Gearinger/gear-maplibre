@@ -9,6 +9,10 @@ import {
   updateManagedModel,
 } from "../common/MapLayerUtil";
 import { map } from "../common/MapUtil";
+import {
+  getLayerLoadStatusLabel,
+  isLayerLoadFailure,
+} from "../common/LayerLoadStatus";
 import { useWorkspace } from "../stores/workspace";
 
 const { activeLayer } = useWorkspace();
@@ -105,6 +109,11 @@ function moveModelToMapCenter() {
       </div>
 
       <div class="style-section">
+        <div v-if="activeLayer.loadStatus && activeLayer.loadStatus.phase !== 'ready'"
+          class="layer-status-panel" :class="{ failed: isLayerLoadFailure(activeLayer.loadStatus) }">
+          <strong>{{ getLayerLoadStatusLabel(activeLayer.loadStatus) }}</strong>
+          <span v-if="activeLayer.loadStatus.message">{{ activeLayer.loadStatus.message }}</span>
+        </div>
         <label class="field-label">
           <span>图层透明度</span>
           <strong>{{ Math.round(activeLayer.opacity * 100) }}%</strong>
@@ -225,6 +234,27 @@ function moveModelToMapCenter() {
 .style-section {
   padding: 16px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.layer-status-panel {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(96, 165, 250, 0.42);
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.12);
+  font-size: 12px;
+}
+
+.layer-status-panel.failed {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(185, 28, 28, 0.13);
+}
+
+.layer-status-panel span {
+  opacity: 0.72;
+  overflow-wrap: anywhere;
 }
 
 .field-label {

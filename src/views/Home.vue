@@ -98,6 +98,7 @@ import {
 } from "../common/GeoJsonUtil";
 import { parseGeoJsonAsync } from "../common/GeoJsonParser";
 import { createSnapshotHistory } from "../common/SnapshotHistory";
+import { createLayerLoadStatus } from "../common/LayerLoadStatus";
 import {
   addGeoJson,
   addFlatGeoBuf,
@@ -119,6 +120,12 @@ import {
   loadWorkspaceSnapshot,
   saveWorkspaceSnapshot,
 } from "../common/WorkspaceStorage";
+import {
+  embedWorkspaceAssetInLayer,
+  getWorkspaceAssetObjectUrl,
+  releaseAllWorkspaceAssetObjectUrls,
+  releaseWorkspaceAssetObjectUrl,
+} from "../common/WorkspaceAssets";
 import { useWorkspace } from "../stores/workspace";
 import type {
   WorkspaceLayer,
@@ -250,7 +257,7 @@ function isGeoJsonBacked(
 }
 
 function cloneSnapshot(snapshot: WorkspaceSnapshot) {
-  return JSON.parse(JSON.stringify(snapshot)) as WorkspaceSnapshot;
+  return structuredClone(snapshot);
 }
 
 async function applyHistorySnapshot(snapshot: WorkspaceSnapshot) {
@@ -260,6 +267,7 @@ async function applyHistorySnapshot(snapshot: WorkspaceSnapshot) {
     for (const layer of layers.value) {
       try {
         removeManagedLayer(layer);
+        releaseWorkspaceAssetObjectUrl(layer.assetId);
       } catch (error) {
         console.warn(`Unable to remove layer ${layer.name}:`, error);
       }
@@ -299,8 +307,16 @@ function exportActiveGeoJson() {
   downloadJson(`${safeFileName()}-${layer.name}.geojson`, layer.data);
 }
 
-function exportProject() {
-  downloadJson(`${safeFileName()}.gear-map.json`, workspace.snapshot());
+async function exportProject() {
+  try {
+    const snapshot = cloneSnapshot(workspace.snapshot());
+    snapshot.layers = await Promise.all(
+      snapshot.layers.map((layer) => embedWorkspaceAssetInLayer(layer))
+    );
+    downloadJson(`${safeFileName()}.gear-map.json`, snapshot);
+  } catch (error) {
+    message.error(`项目导出失败：${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function chooseProjectFile() {
@@ -323,11 +339,18 @@ async function importProjectFile(event: Event) {
       throw new Error("不是有效的 Gear Map 项目文件");
     }
 
-    for (const layer of layers.value) removeManagedLayer(layer);
+    for (const layer of layers.value) {
+      removeManagedLayer(layer);
+      releaseWorkspaceAssetObjectUrl(layer.assetId);
+    }
     workspace.clearLayers();
-    await restoreWorkspace(snapshot);
+    const failures = await restoreWorkspace(snapshot);
     history.reset(cloneSnapshot(workspace.snapshot()));
-    message.success("项目导入成功");
+    if (failures.length > 0) {
+      message.warning(`项目已导入，但有 ${failures.length} 个图层恢复失败`);
+    } else {
+      message.success("项目导入成功");
+    }
   } catch (error) {
     message.error(`项目导入失败：${error instanceof Error ? error.message : String(error)}`);
   }
@@ -639,6 +662,7 @@ function registerMapEvents() {
 
 async function restoreWorkspace(snapshot: WorkspaceSnapshot) {
   const restored: WorkspaceLayer[] = [];
+  const failures: string[] = [];
   for (const saved of snapshot.layers) {
     try {
       let managed;
@@ -663,6 +687,14 @@ async function restoreWorkspace(snapshot: WorkspaceSnapshot) {
         );
       } else if (saved.type === "3D Tiles" && saved.url) {
         managed = await add3DTilesLayer(saved.id, saved.url);
+      } else if (saved.type === "Model" && saved.assetId && saved.coordinates) {
+        const modelUrl = await getWorkspaceAssetObjectUrl(saved.assetId);
+        managed = await addModelLayer(
+          saved.id,
+          modelUrl,
+          saved.coordinates,
+          saved.modelScale ?? 1
+        );
       } else if (saved.type === "Model" && saved.url && saved.coordinates) {
         managed = await addModelLayer(
           saved.id,
@@ -671,7 +703,7 @@ async function restoreWorkspace(snapshot: WorkspaceSnapshot) {
           saved.modelScale ?? 1
         );
       } else if (saved.type === "Vector Tile" && saved.url) {
-        managed = await addPbfLayer(saved.id, saved.url);
+        managed = await addPbfLayer(saved.id, saved.url, saved.sourceLayer);
       } else if (saved.data) {
         managed = await addGeoJson(saved.id, saved.data);
       } else if (saved.url) {
@@ -689,7 +721,13 @@ async function restoreWorkspace(snapshot: WorkspaceSnapshot) {
         opacity: saved.opacity,
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.warn(`Unable to restore layer ${saved.name}:`, error);
+      restored.push({
+        ...saved,
+        loadStatus: createLayerLoadStatus("error", message),
+      });
+      failures.push(`${saved.name}: ${message}`);
     }
   }
 
@@ -700,6 +738,7 @@ async function restoreWorkspace(snapshot: WorkspaceSnapshot) {
     applyManagedLayerStyle(layer);
   }
   applyManagedLayerOrder(restored);
+  return failures;
 }
 
 async function initializeWorkspace() {
@@ -713,7 +752,10 @@ async function initializeWorkspace() {
   }
 
   if (snapshot) {
-    await restoreWorkspace(snapshot);
+    const failures = await restoreWorkspace(snapshot);
+    if (failures.length > 0) {
+      message.warning(`部分图层恢复失败：${failures.join("；")}`);
+    }
   } else {
     showOnboarding.value = true;
   }
@@ -777,6 +819,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeyDown);
   clearTimeout(editorTimer);
   clearTimeout(saveTimer);
+  releaseAllWorkspaceAssetObjectUrls();
   if (pointerFrame !== undefined) cancelAnimationFrame(pointerFrame);
   if (mapEventsReady) {
     map.off("click", onMapClick);

@@ -32,6 +32,15 @@ import {
   setManagedLayerVisibility,
 } from "../common/MapLayerUtil";
 import { parseGeoJsonAsync } from "../common/GeoJsonParser";
+import {
+  getWorkspaceAssetObjectUrl,
+  releaseWorkspaceAssetObjectUrl,
+  storeWorkspaceAsset,
+} from "../common/WorkspaceAssets";
+import {
+  getLayerLoadStatusLabel,
+  isLayerLoadFailure,
+} from "../common/LayerLoadStatus";
 import { useWorkspace } from "../stores/workspace";
 import type { WorkspaceLayer } from "../types/workspace";
 
@@ -62,6 +71,7 @@ const urlModel = reactive({
   type: "Tile",
   layerName: "layer",
   url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  sourceLayer: "",
   terrainEncoding: "terrarium" as "mapbox" | "terrarium",
   longitude: 103,
   latitude: 38,
@@ -91,6 +101,7 @@ const layerFields = [
     dataIndex: "type",
     width: 75,
     align: "center",
+    slots: { customRender: "type" },
   },
   {
     title: "要素",
@@ -142,6 +153,10 @@ function registerLayer(managed: Awaited<ReturnType<typeof addGeoJson>>, name: st
   return layer;
 }
 
+function hasPendingLayerLoads() {
+  return layers.value.some((layer) => layer.loadStatus?.phase === "loading");
+}
+
 async function loadLocalFiles(files: File[]) {
   importing.value = true;
   let loaded = 0;
@@ -161,20 +176,32 @@ async function loadLocalFiles(files: File[]) {
             displayName
           );
         } else if (ext === "glb" || ext === "gltf") {
-          const modelUrl = await readFileAsDataUrl(
-            file,
-            ext === "glb" ? "model/gltf-binary" : "model/gltf+json"
+          const contentType = ext === "glb" ? "model/gltf-binary" : "model/gltf+json";
+          if (ext === "gltf") {
+            const json = JSON.parse(await file.text()) as {
+              buffers?: Array<{ uri?: string }>;
+              images?: Array<{ uri?: string }>;
+            };
+            const externalUri = [...(json.buffers ?? []), ...(json.images ?? [])]
+              .find((resource) => resource.uri && !resource.uri.startsWith("data:"));
+            if (externalUri) {
+              throw new Error("本地 .gltf 引用了外部资源，请改用 GLB 或完整 URL");
+            }
+          }
+          const typedFile = new File([file], file.name, { type: contentType });
+          const asset = await storeWorkspaceAsset(typedFile);
+          const modelUrl = await getWorkspaceAssetObjectUrl(asset.id);
+          const managed = await addModelLayer(
+            sourceName,
+            modelUrl,
+            [map.getCenter().lng, map.getCenter().lat, 0],
+            1
           );
-          const center = map.getCenter();
-          registerLayer(
-            await addModelLayer(
-              sourceName,
-              modelUrl,
-              [center.lng, center.lat, 0],
-              1
-            ),
-            displayName
-          );
+          managed.assetId = asset.id;
+          managed.assetName = asset.name;
+          managed.assetMimeType = asset.type;
+          managed.assetSize = asset.size;
+          registerLayer(managed, displayName);
         } else {
           throw new Error(`暂不支持文件格式：.${ext}`);
         }
@@ -189,7 +216,11 @@ async function loadLocalFiles(files: File[]) {
 
   if (loaded > 0) {
     importVisible.value = false;
-    message.success(`已加载 ${loaded} 个文件`);
+    message.success(
+      hasPendingLayerLoads()
+        ? `已加入 ${loaded} 个文件，图层仍在加载`
+        : `已加载 ${loaded} 个文件`
+    );
   }
   if (failures.length > 0) {
     message.error(failures.join("；"));
@@ -199,6 +230,7 @@ async function loadLocalFiles(files: File[]) {
 async function deleteLayer(layer: WorkspaceLayer) {
   try {
     removeManagedLayer(layer);
+    releaseWorkspaceAssetObjectUrl(layer.assetId);
     workspace.removeLayer(layer.key);
     message.success("图层删除成功！");
   } catch (error) {
@@ -232,7 +264,11 @@ async function createUrlLayer(layerName: string): Promise<Awaited<ReturnType<typ
     case "Tile":
       return addTileLayer(layerName, urlModel.url);
     case "Vector Tile":
-      return addPbfLayer(layerName, urlModel.url);
+      return addPbfLayer(
+        layerName,
+        urlModel.url,
+        urlModel.sourceLayer.trim() || undefined
+      );
     case "GeoJSON":
       return addGeoJson(layerName, urlModel.url);
     case "FlatGeobuf":
@@ -260,15 +296,6 @@ async function createUrlLayer(layerName: string): Promise<Awaited<ReturnType<typ
   }
 }
 
-function readFileAsDataUrl(file: File, contentType: string) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("模型文件读取失败"));
-    reader.readAsDataURL(new Blob([file], { type: contentType }));
-  });
-}
-
 async function importfinish() {
   if (activeTab.value === "1") {
     importVisible.value = false;
@@ -292,7 +319,11 @@ async function importfinish() {
     }
 
     importVisible.value = false;
-    message.success("图层导入成功！");
+    message.success(
+      hasPendingLayerLoads()
+        ? "图层已加入，正在后台加载"
+        : "图层导入成功！"
+    );
   } catch (error) {
     message.error(`图层导入失败：${getErrorMessage(error)}`);
   } finally {
@@ -421,6 +452,13 @@ function helpHandle() {
                         URL 必须可直接访问模型及 .gltf 引用的外部资源
                       </div>
                     </a-form-item>
+                    <a-form-item v-if="urlModel.type === 'Vector Tile'" label="sourceLayer">
+                      <a-input v-model:value="urlModel.sourceLayer" size="small"
+                        placeholder="TileJSON 中 vector_layers 的 id"></a-input>
+                      <div class="field-hint">
+                        不填写时使用 layerName；单个 .pbf 地址不能作为底图
+                      </div>
+                    </a-form-item>
                     <a-form-item v-if="urlModel.type === 'Terrain'" label="encoding">
                       <a-select v-model:value="urlModel.terrainEncoding" size="small">
                         <a-select-option value="terrarium">Terrarium</a-select-option>
@@ -480,6 +518,20 @@ function helpHandle() {
             <a-input v-if="editingKey === record.key" v-model:value="editingName" size="small"
               @click.stop @blur="commitRename(record)" @pressEnter="commitRename(record)" />
             <span v-else class="layer-name">{{ record.name }}</span>
+          </div>
+        </template>
+        <template #type="{ record }">
+          <div class="layer-type-cell">
+            <span>{{ record.type }}</span>
+            <a-tooltip v-if="record.loadStatus?.phase !== 'ready'"
+              :title="record.loadStatus?.message || getLayerLoadStatusLabel(record.loadStatus)">
+              <span class="layer-load-status" :class="{
+                loading: record.loadStatus?.phase === 'loading',
+                failed: isLayerLoadFailure(record.loadStatus),
+              }">
+                {{ getLayerLoadStatusLabel(record.loadStatus) }}
+              </span>
+            </a-tooltip>
           </div>
         </template>
         <template #opacity="{ record }">
@@ -575,6 +627,36 @@ function helpHandle() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.layer-type-cell {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.layer-load-status {
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.14);
+  color: #7dd3fc;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.layer-load-status.loading {
+  animation: layer-status-pulse 1.2s ease-in-out infinite;
+}
+
+.layer-load-status.failed {
+  background: rgba(248, 113, 113, 0.14);
+  color: #fca5a5;
+}
+
+@keyframes layer-status-pulse {
+  50% {
+    opacity: 0.45;
+  }
 }
 
 .visibility-button {
