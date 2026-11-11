@@ -161,7 +161,10 @@ async function loadLocalFiles(files: File[]) {
             displayName
           );
         } else if (ext === "glb" || ext === "gltf") {
-          const modelUrl = await readFileAsDataUrl(file);
+          const modelUrl = await readFileAsDataUrl(
+            file,
+            ext === "glb" ? "model/gltf-binary" : "model/gltf+json"
+          );
           const center = map.getCenter();
           registerLayer(
             await addModelLayer(
@@ -257,12 +260,12 @@ async function createUrlLayer(layerName: string): Promise<Awaited<ReturnType<typ
   }
 }
 
-function readFileAsDataUrl(file: File) {
+function readFileAsDataUrl(file: File, contentType: string) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(reader.error ?? new Error("模型文件读取失败"));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(new Blob([file], { type: contentType }));
   });
 }
 
