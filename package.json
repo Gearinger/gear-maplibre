@@ -71,5 +71,8 @@
     "image-size": "2.1.0",
     "protocol-buffers-schema": "3.6.1",
     "source-map-js": "1.2.2"
+  },
+  "patchedDependencies": {
+    "@loaders.gl/gltf@4.4.5": "patches/@loaders.gl%2Fgltf@4.4.5.patch"
   }
 }

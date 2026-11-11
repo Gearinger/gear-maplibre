@@ -1,0 +1,18 @@
+diff --git a/dist/lib/gltf-utils/gltf-utils.js b/dist/lib/gltf-utils/gltf-utils.js
+index 6c4ee48d64a325fcd96055f2766ed288fd6cd5cf..dfa8f428e33dca8e64e2aa5dc0fd13e4d549f7b9 100644
+--- a/dist/lib/gltf-utils/gltf-utils.js
++++ b/dist/lib/gltf-utils/gltf-utils.js
+@@ -56,9 +56,10 @@ export function getAccessorArrayTypeAndLength(accessor, bufferView) {
+     const ArrayType = ATTRIBUTE_COMPONENT_TYPE_TO_ARRAY[accessor.componentType];
+     const components = ATTRIBUTE_TYPE_TO_COMPONENTS[accessor.type];
+     const bytesPerComponent = ATTRIBUTE_COMPONENT_TYPE_TO_BYTE_SIZE[accessor.componentType];
+-    const length = accessor.count * components;
+-    const byteLength = accessor.count * components * bytesPerComponent;
+-    assert(byteLength >= 0 && byteLength <= bufferView.byteLength);
++    const requestedByteLength = accessor.count * components * bytesPerComponent;
++    const availableByteLength = Math.floor(bufferView.byteLength / bytesPerComponent) * bytesPerComponent;
++    const byteLength = Math.min(Math.max(requestedByteLength, 0), availableByteLength);
++    const length = byteLength / bytesPerComponent;
+     const componentByteSize = BYTES[accessor.componentType];
+     const numberOfComponentsInElement = COMPONENTS[accessor.type];
+     return { ArrayType, length, byteLength, componentByteSize, numberOfComponentsInElement };
