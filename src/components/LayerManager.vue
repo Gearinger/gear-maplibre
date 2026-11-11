@@ -10,6 +10,7 @@ import {
   PlusOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 import { map } from "../common/MapUtil";
@@ -37,6 +38,7 @@ import {
   releaseWorkspaceAssetObjectUrl,
   storeWorkspaceAsset,
 } from "../common/WorkspaceAssets";
+import { createLayerLoadStatus } from "../common/LayerLoadStatus";
 import {
   getLayerLoadStatusLabel,
   isLayerLoadFailure,
@@ -235,6 +237,77 @@ async function deleteLayer(layer: WorkspaceLayer) {
     message.success("图层删除成功！");
   } catch (error) {
     message.error(`图层删除失败：${getErrorMessage(error)}`);
+  }
+}
+
+async function retryLayer(layer: WorkspaceLayer) {
+  if (layer.loadStatus?.phase !== "error" && layer.loadStatus?.phase !== "partial") {
+    return;
+  }
+
+  try {
+    removeManagedLayer(layer);
+    let managed: Awaited<ReturnType<typeof addGeoJson>>;
+
+    if (layer.type === "3D Tiles" && layer.url) {
+      managed = await add3DTilesLayer(layer.id, layer.url);
+    } else if (layer.type === "Model") {
+      const modelUrl = layer.assetId
+        ? await getWorkspaceAssetObjectUrl(layer.assetId)
+        : layer.url;
+      if (!modelUrl || !layer.coordinates) {
+        throw new Error("模型资源或位置信息不完整");
+      }
+      managed = await addModelLayer(
+        layer.id,
+        modelUrl,
+        layer.coordinates,
+        layer.modelScale ?? 1
+      );
+    } else if (layer.type === "Vector Tile" && layer.url) {
+      managed = await addPbfLayer(layer.id, layer.url, layer.sourceLayer);
+    } else if (layer.type === "PMTiles" && layer.url) {
+      managed = await addPmtilesLayer(layer.id, layer.url);
+    } else if (layer.type === "GeoTIFF" && layer.url) {
+      managed = await addGeoTiffLayer(layer.id, layer.url);
+    } else if (layer.type === "Terrain" && layer.url) {
+      managed = await addTerrainLayer(
+        layer.id,
+        layer.url,
+        layer.terrainEncoding ?? "terrarium"
+      );
+    } else if (layer.type === "XYZ-Tile" && layer.url) {
+      managed = await addTileLayer(layer.id, layer.url);
+    } else if (layer.type === "FlatGeobuf" && layer.data) {
+      managed = {
+        ...await addGeoJson(layer.id, layer.data),
+        type: "FlatGeobuf",
+      };
+    } else if (layer.data) {
+      managed = await addGeoJson(layer.id, layer.data);
+    } else if (layer.url) {
+      managed = await addGeoJson(layer.id, layer.url);
+    } else {
+      throw new Error("图层缺少可重试的数据或 URL");
+    }
+
+    Object.assign(layer, managed, {
+      key: layer.key,
+      name: layer.name,
+      visible: layer.visible,
+      opacity: layer.opacity,
+      style: layer.style,
+      loadStatus: managed.loadStatus ?? createLayerLoadStatus("ready"),
+    });
+    setManagedLayerVisibility(layer, layer.visible);
+    setManagedLayerOpacity(layer, layer.opacity);
+    applyManagedLayerStyle(layer);
+    applyManagedLayerOrder(layers.value);
+    if (layer.bounds) fitManagedLayer(layer);
+    message.success("图层重试成功");
+  } catch (error) {
+    layer.loadStatus = createLayerLoadStatus("error", getErrorMessage(error));
+    message.error(`图层重试失败：${getErrorMessage(error)}`);
   }
 }
 
@@ -539,6 +612,10 @@ function helpHandle() {
             @click.stop @input="changeOpacity($event, record)">
         </template>
         <template #operation="{ record }">
+          <a-button v-if="isLayerLoadFailure(record.loadStatus)" title="重试加载"
+            size="small" type="text" @click.stop="retryLayer(record)">
+            <template #icon><ReloadOutlined /></template>
+          </a-button>
           <a-button title="上移图层" size="small" type="text" @click.stop="moveLayer(record, -1)">
             <template #icon><ArrowUpOutlined /></template>
           </a-button>
