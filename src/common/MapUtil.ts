@@ -14,6 +14,20 @@ export function destroyMap() {
     map = undefined as unknown as Map;
 }
 
+const blankStyle: any = {
+    version: 8,
+    sources: {},
+    layers: [
+        {
+            id: 'background',
+            type: 'background',
+            paint: {
+                'background-color': "#fff"
+            }
+        }
+    ]
+};
+
 /**
  * 初始化地图
  */
@@ -21,9 +35,9 @@ export function initMap(containerId: string): Map {
     // 初始化地图
     map = new Map({
         container: containerId, // container id
-        style: import.meta.env.VITE_MAP_STYLE_URL || "https://demotiles.maplibre.org/style.json",
+        // style: import.meta.env.VITE_MAP_STYLE_URL || "https://demotiles.maplibre.org/style.json",
         // style: "https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL",
-        // style: blankStyle,
+        style: blankStyle,
         center: [103, 38], // starting position [lng, lat]
         zoom: 3, // starting zoom
     });

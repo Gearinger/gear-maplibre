@@ -2,6 +2,7 @@ import type { Layer } from "@deck.gl/core";
 import type { MapLibreOverlay } from "@deck.gl/maplibre";
 import type { IControl, Map as MapLibreMap } from "maplibre-gl";
 
+
 interface DeckLayerRecord {
   id: string;
   layer: Layer;
@@ -14,6 +15,8 @@ type DeckModules = {
   Tile3DLayer: typeof import("@deck.gl/geo-layers").Tile3DLayer;
   ScenegraphLayer: typeof import("@deck.gl/mesh-layers").ScenegraphLayer;
   Tiles3DLoader: typeof import("@loaders.gl/3d-tiles").Tiles3DLoader;
+  DracoLoader: typeof import("@loaders.gl/draco").DracoLoader;
+  BasisLoader: typeof import("@loaders.gl/textures").BasisLoader;
 };
 
 let modules: DeckModules | undefined;
@@ -27,11 +30,15 @@ async function ensureOverlay(mapInstance: MapLibreMap) {
     { Tile3DLayer },
     { ScenegraphLayer },
     { Tiles3DLoader },
+    { DracoLoader },
+    { BasisLoader }
   ] = await Promise.all([
     import("@deck.gl/maplibre"),
     import("@deck.gl/geo-layers"),
     import("@deck.gl/mesh-layers"),
     import("@loaders.gl/3d-tiles"),
+    import("@loaders.gl/draco"),
+    import("@loaders.gl/textures"),
   ]);
 
   const overlay = new MapLibreOverlay({
@@ -44,6 +51,8 @@ async function ensureOverlay(mapInstance: MapLibreMap) {
     Tile3DLayer,
     ScenegraphLayer,
     Tiles3DLoader,
+    DracoLoader,
+    BasisLoader,
   };
   return modules;
 }
@@ -65,7 +74,7 @@ export async function add3DTilesDeckLayer(
   id: string,
   url: string
 ) {
-  const { Tile3DLayer, Tiles3DLoader } = await ensureOverlay(mapInstance);
+  const { Tile3DLayer, Tiles3DLoader, DracoLoader, BasisLoader } = await ensureOverlay(mapInstance);
   return new Promise<{
     coordinates: [number, number, number];
     zoom: number;
@@ -74,35 +83,34 @@ export async function add3DTilesDeckLayer(
     const layer = new Tile3DLayer({
       id,
       data: url,
-      loaders: [Tiles3DLoader],
+      loader: Tiles3DLoader,
+
       loadOptions: {
         "3d-tiles": {
           loadGLTF: true,
-          decodeQuantizedPositions: true,
         },
       },
+
       pickable: false,
+
       onTilesetLoad: (tileset) => {
-        clearTimeout(timeout);
-        const center = tileset.cartographicCenter;
-        if (!center) {
-          resolve(undefined);
-          return;
-        }
-        const zoom = Math.min(tileset.zoom, 18);
-        mapInstance.flyTo({
-          center: [center[0], center[1]],
-          zoom,
-          pitch: 45,
-          duration: 1200,
-        });
-        resolve({
-          coordinates: [center[0], center[1], center[2] ?? 0],
-          zoom,
-        });
       },
-      onTileError: (_tile, tileUrl, message) => {
-        console.error(`3D Tiles tile failed: ${tileUrl}`, message);
+
+      onTileLoad: (tile) => {
+      },
+
+      onTileError: (...args: any[]) => {
+        const [tile, arg2, arg3] = args;
+
+        console.error("Tile 加载失败:", {
+          id: tile?.id,
+          header: tile?.header,
+          content: tile?.content,
+          contentType: tile?.contentType,
+          contentState: tile?.contentState,
+          arg2,
+          arg3,
+        });
       },
     });
     records.set(id, { id, layer, visible: true, opacity: 1 });
