@@ -25,12 +25,10 @@
     "@maplibre/maplibre-gl-geocoder": "^1.9.4",
     "@turf/turf": "^7.4.0",
     "ant-design-vue": "^4.2.6",
-    "draco": "^0.0.1",
     "flatgeobuf": "^4.6.1",
     "geotiff": "^3.0.5",
     "maplibre-gl": "^6.16.0",
     "pmtiles": "^4.5.0",
-    "textures": "^1.2.3",
     "vue": "^3.5.45",
     "vue-codemirror": "^6.1.1",
     "vue-router": "^4.6.4"
