@@ -19,6 +19,18 @@ type DeckModules = {
 let modules: DeckModules | undefined;
 const records = new Map<string, DeckLayerRecord>();
 
+function getDecoderModules() {
+  const assetUrl = (path: string) =>
+    new URL(`${import.meta.env.BASE_URL}loaders.gl/${path}`, window.location.href).href;
+
+  return {
+    "draco_wasm_wrapper.js": assetUrl("draco/draco_wasm_wrapper.js"),
+    "draco_decoder.wasm": assetUrl("draco/draco_decoder.wasm"),
+    "basis_encoder.js": assetUrl("textures/basis_encoder.js"),
+    "basis_encoder.wasm": assetUrl("textures/basis_encoder.wasm"),
+  };
+}
+
 async function ensureOverlay(mapInstance: MapLibreMap) {
   if (modules) return modules;
 
@@ -76,6 +88,8 @@ export async function add3DTilesDeckLayer(
       data: url,
       loaders: [Tiles3DLoader],
       loadOptions: {
+        useLocalLibraries: true,
+        modules: getDecoderModules(),
         "3d-tiles": {
           loadGLTF: true,
           decodeQuantizedPositions: true,
